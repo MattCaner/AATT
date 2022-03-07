@@ -1,2 +1,2 @@
 # AATT
-Advanced Adaptive Transformer Topologies
+AATT (Advanced Adaptive Transformer Topologies) is an experimental implementation of transformer network topologies
