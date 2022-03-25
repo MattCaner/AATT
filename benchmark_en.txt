@@ -1,0 +1,14 @@
+I like dogs.
+I like cats.
+I like cheese.
+I like black dogs.
+I like black cats.
+I eat cheese.
+Cats do not eat cheese.
+Dogs eat cheese.
+I like white cheese.
+I like white cats.
+Dogs are not black.
+Cats are sometimes white.
+White cats are nice.
+Black cats are nice.

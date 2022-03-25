@@ -15,6 +15,7 @@ from torch import Tensor
 import math
 import configparser
 from torch.utils.data import Dataset, DataLoader
+import copy
 
 # custom util transformer entity
 # CUTE
@@ -23,7 +24,9 @@ class Utils():
     @staticmethod
     def tokenize(text: str) -> List[str]:
         tokenizer = get_tokenizer("moses")
-        return tokenizer(text)
+        result = tokenizer(text)
+        result.append("<eos>")
+        return result
 
     @staticmethod
     def yield_tokens(file_path):
@@ -38,36 +41,94 @@ class Utils():
         phase = pos / highValue ** (torch.div(dim, dim_model, rounding_mode='floor'))
         return torch.where(dim.long() % 2 == 0, torch.sin(phase), torch.cos(phase))
 
+# empty class so that pylance works
+class ParameterProvider():
+    pass
+
 class ParameterProvider():
     def __init__(self, configname):
-        self.config = configparser.ConfigParser()
-        self.config.read(configname)
+        if configname:
+            self.config = configparser.ConfigParser()
+            self.config.read(configname)
+            self.dictionary = {
+                "d_model": int(self.config['DIMENSIONS AND SIZES']['d_model']),
+                "d_qk": int(self.config['DIMENSIONS AND SIZES']['d_qk']),
+                "d_v": int(self.config['DIMENSIONS AND SIZES']['d_v']),
+                "d_ff": int(self.config['DIMENSIONS AND SIZES']['d_ff']),
+                "n_encoders": int(self.config['DIMENSIONS AND SIZES']['n_encoders']),
+                "n_decoders": int(self.config['DIMENSIONS AND SIZES']['n_decoders']),
+                "n_heads": int(self.config['DIMENSIONS AND SIZES']['n_heads']),
+                "language_in_file": self.config['VOCAB PARAMETERS']['language_in_file'],
+                "language_out_file": self.config['VOCAB PARAMETERS']['language_out_file'],
+                "vocab_in_size": 0,
+                "vocab_out_size": 0,
+                "learning_rate": float(self.config['TRAINING PARAMETERS']['learning_rate']),
+                "epochs": int(self.config['TRAINING PARAMETERS']['epochs'])
+            }
+        else:
+            self.dictionary = {
+                "d_model": 0,
+                "d_qk": 0,
+                "d_v": 0,
+                "d_ff": 0,
+                "n_encoders": 0,
+                "n_decoders": 0,
+                "n_heads": 0,
+                "language_in_file": "",
+                "language_out_file": "",
+                "vocab_in_size": 0,
+                "vocab_out_size": 0,
+                "learning_rate": 0.0,
+                "epochs": 0
+            }
+    
+    def modifyWithArray(self, arr: List) -> None:
         self.dictionary = {
-            "d_model": int(self.config['DIMENSIONS AND SIZES']['d_model']),
-            "d_qk": int(self.config['DIMENSIONS AND SIZES']['d_qk']),
-            "d_v": int(self.config['DIMENSIONS AND SIZES']['d_v']),
-            "d_ff": int(self.config['DIMENSIONS AND SIZES']['d_ff']),
-            "n_encoders": int(self.config['DIMENSIONS AND SIZES']['n_encoders']),
-            "n_decoders": int(self.config['DIMENSIONS AND SIZES']['n_decoders']),
-            "n_heads": int(self.config['DIMENSIONS AND SIZES']['n_heads']),
-            "language_in_file": self.config['VOCAB PARAMETERS']['language_in_file'],
-            "language_out_file": self.config['VOCAB PARAMETERS']['language_out_file'],
-            "vocab_in_size": 0,
-            "vocab_out_size": 0,
+            "d_model": arr[0],
+            "d_qk": arr[1],
+            "d_v": arr[2],
+            "d_ff": arr[3],
+            "n_encoders": arr[4],
+            "n_decoders": arr[5],
+            "n_heads": arr[6],
+            "epochs": arr[7],
+            "learning_rate": self.dictionary["learning_rate"],
+            "language_in_file": self.dictionary["language_in_file"],
+            "language_out_file": self.dictionary["language_out_file"],
+            "vocab_in_size": self.dictionary["vocab_in_size"],
+            "vocab_out_size": self.dictionary["vocab_out_size"],
         }
 
-    def provide(self, key: str):
+    def getArray(self) -> List:
+        return [
+            self.dictionary["d_model"],
+            self.dictionary["d_qk"],
+            self.dictionary["d_v"],
+            self.dictionary["d_ff"],
+            self.dictionary["n_encoders"],
+            self.dictionary["n_decoders"],
+            self.dictionary["n_heads"],
+            self.dictionary["epochs"],
+        ]
+
+    def provide(self, key: str) -> any:
         return self.dictionary[key]
         
-    def change(self, key: str, value: number):
+    def change(self, key: str, value: number) -> None:
         self.dictionary[key] = value
+
+    def getChangedCopy(self,key: str, value:number) -> ParameterProvider:
+        pp = copy.deepcopy(self)
+        pp.change(key,value)
+        return pp
+
 
 
 
 
 class VocabProvider():
     def __init__(self, config: ParameterProvider, vocabSourceFile: str):
-        self.vocab = build_vocab_from_iterator(Utils.yield_tokens(config.provide(vocabSourceFile)), specials=["<unk>"])
+        self.vocab = build_vocab_from_iterator(Utils.yield_tokens(vocabSourceFile), specials=["<unk>"])
         self.vocab.append_token("<eos>")
         self.vocab.set_default_index(0)
     
@@ -105,13 +166,13 @@ class Embedding(nn.Module):
             return self.embedding(torch.tensor(self.vocab(tokenized_str)))
 '''
 class AttentionHead(nn.Module):
-    def __init__(self, config: ParameterProvider, masked = false):
+    def __init__(self, config: ParameterProvider, masked: bool = False, d_v_override: int = None, d_qk_override: int = None):
         super().__init__()
         self.l = nn.Linear(100,200)
         self.masked = masked
         self.d_model = config.provide("d_model")
-        self.d_qk = config.provide("d_qk")
-        self.d_v = config.provide("d_v")
+        self.d_qk = config.provide("d_qk") if d_qk_override is None else d_qk_override
+        self.d_v = config.provide("d_v") if d_v_override is None else d_v_override
         self.WQ = nn.Linear(self.d_model,self.d_qk)
         self.WK = nn.Linear(self.d_model,self.d_qk)
         self.WV = nn.Linear(self.d_model,self.d_v)
@@ -131,13 +192,15 @@ class AttentionHead(nn.Module):
 
 
 class MultiHeadedAttention(nn.Module):
-    def __init__(self,config: ParameterProvider, masked = False):
+    def __init__(self,config: ParameterProvider, masked = False, d_v_override = None, d_qk_ovveride: int = None, n_heads_override = None):
         super().__init__()
         self.d_model = config.provide("d_model")
-        self.d_v = config.provide("d_v")
-        self.n_heads = config.provide("n_heads")
-        self.heads = [AttentionHead(config,masked=masked) for _ in range(self.n_heads)]
+        self.d_v = config.provide("d_v") if d_v_override is None else d_v_override
+        self.d_qk = config.provide("d_qk") if d_qk_ovveride is None else d_qk_ovveride
+        self.n_heads = config.provide("n_heads") if n_heads_override is None else n_heads_override
+        self.heads = [AttentionHead(config,masked=masked,d_qk_override=d_qk_ovveride,d_v_override=d_v_override) for _ in range(self.n_heads)]
         self.linear = nn.Linear(self.d_v*self.n_heads,self.d_model)
+        self.masked = masked
     
     def forward(self, input_q, input_k, input_v):
         concatResult = torch.cat([h(input_q, input_k, input_v) for h in self.heads], dim = -1)
@@ -192,7 +255,8 @@ class NumericalOut(nn.Module):
         self.linear = nn.Linear(config.provide("d_model"),config.provide("vocab_out_size"))
     
     def forward(self, input_data: Tensor) -> Tensor:
-        return torch.softmax(self.linear(input_data), dim = -1)
+        #return torch.softmax(self.linear(input_data), dim = -1)
+        return self.linear(input_data)
 
 class LexicalOut(nn.Module):
     def __init__(self, config: ParameterProvider, vocab: VocabProvider):
@@ -220,6 +284,8 @@ class DecoderStack(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, config: ParameterProvider, vocab_in: VocabProvider, vocab_out: VocabProvider):
         super().__init__()
+        self.config = config
+        self.d_model = config.provide("d_model")
         self.vocab_in = vocab_in 
         config.change("vocab_in_size",self.vocab_in.getVocabLength())        
         self.embedding_in = Embedder(config,self.vocab_in)
@@ -252,8 +318,10 @@ class CustomDataSet(Dataset):
 
         fin = open(infile, "r",encoding = 'utf-8')
         fout = open(outfile,"r",encoding = 'utf-8')
-        self.X = list(map(str.lower,fin.readlines()))
-        self.Y = list(map(str.lower,fout.readlines()))
+        Xlines = list(map(str.lower,fin.readlines()))
+        Ylines = list(map(str.lower,fout.readlines()))
+        self.X = [l[:-1] for l in Xlines]
+        self.Y = [l[:-1] for l in Ylines]
         if len(self.X) != len(self.Y):
             raise Exception('Sets are of different sizes')
         fin.close()
@@ -273,56 +341,58 @@ class CustomDataSet(Dataset):
         
         return _x, _y, _z
 
+    def getSets(self):
+        train_size = int(0.8 * len(self))
+        test_size = len(self) - train_size
+        return torch.utils.data.random_split(self, [train_size, test_size])
 
 
-params = ParameterProvider("params.config")
+'''
 
 
-v_in = VocabProvider(params,"language_in_file")
-v_out = VocabProvider(params,"language_out_file")
-t = Transformer(params, v_in, v_out)
+
 
 cd = CustomDataSet('simplepl.txt', 'simpleen.txt',v_out)
 
 
-train_size = int(0.8 * len(cd))
-test_size = len(cd) - train_size
-train_dataset, test_dataset = torch.utils.data.random_split(cd, [train_size, test_size])
+
+
+train_dataset, test_dataset = cd.getSets()
 
 loader = iter(DataLoader(train_dataset, batch_size=1, shuffle=True))
 
 
-
-out = t("skończmy to jak najszybciej zamiast to przeciągać","let's get it over with as soon as possible rather than drag it out")
-
 criterion = torch.nn.CrossEntropyLoss()
+
 
 lr = 1.0
 optimizer = torch.optim.SGD(t.parameters(), lr=lr)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
 
-epochs = 100
+'''
 
-def train(model: nn.Module) -> None:
-
+def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1, criterion = torch.nn.CrossEntropyLoss()) -> None:
+    model.train()
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    
+    #with torch.autograd.set_detect_anomaly(True):
     total_loss = 0.
     for i, value in enumerate(train_dataset):
         data_in = value[0]
         data_out = value[1]
         data_out_numeric = value[2]
 
+        optimizer.zero_grad()
         output = model(data_in,data_out)
         loss = criterion(output,data_out_numeric)
-
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
 
 
-def evaluate(model: nn.Module) -> float:
-    model.eval()  # turn on evaluation mode
+def evaluate(model: nn.Module, test_dataset: CustomDataSet, criterion = torch.nn.CrossEntropyLoss()) -> float:
+    model.eval()
     total_loss = 0.
     with torch.no_grad():
         for i, value in enumerate(test_dataset):
@@ -330,14 +400,18 @@ def evaluate(model: nn.Module) -> float:
             data_out = value[1]
             data_out_numeric = value[2]
             output = model(data_in, data_out)
-            total_loss += criterion(output, data_out_numeric).item()
-    return total_loss / (len(train_dataset) - 1)
+            total_loss += criterion(output, data_out_numeric).item() / data_out_numeric.size(0)
+    return total_loss / (len(test_dataset))
 
-
-for i in range(0, 100):
-
-    train(t)
-    ev = evaluate(t)
-    print(f' Epoch: {i}, eval: {ev:f}')
-
+def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss()) -> float:
+    
+    new_result = evaluate(model,train_dataset)
+    for i in range(0,max_epochs):
+        old_result = new_result
+        train(model,train_dataset,lr,1)
+        new_result = evaluate(model,train_dataset)
+        difference = (old_result - new_result) / old_result
+        if abs(difference) < min_difference:
+            return new_result
+    return new_result
 

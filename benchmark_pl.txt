@@ -1,0 +1,14 @@
+Lubię psy.
+Lubię koty.
+Lubię ser.
+Lubię czarne psy.
+Lubię czarne koty.
+Jem ser.
+Koty nie jedzą sera.
+Psy jedzą ser.
+Lubię biały ser.
+Lubię białe koty.
+Psy nie są czarne.
+Psy są też białe.
+Białe koty są fajne.
+Czarne koty są fajne.
