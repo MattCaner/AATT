@@ -1,20 +1,14 @@
-from base64 import encode
-from hmac import trans_36
 import io
 from typing import List
 from numpy import number
-from sqlalchemy import false
-from sympy import numer
 import torch
-import torch.nn.functional as f
-from torch import inner, nn
+from torch import nn
 from torchtext.data import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
-from torchtext.vocab import Vocab
 from torch import Tensor
 import math
 import configparser
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import copy
 
 # custom util transformer entity
@@ -151,20 +145,7 @@ class Embedder(nn.Module):
             return torch.empty(self.dimension)
         else:
             return self.embedding(self.vocab.getValues(tokenized_str))
-'''
-class Embedding(nn.Module):
-    def __init__(self, vocab: Vocab, dE: int):
-        super().__init__()
-        self.vocab = vocab
-        self.dimension = dE
-        self.embedding = nn.Embedding(len(vocab), dE)
-    
-    def forward(self, tokenized_str) -> Tensor:
-        if len(tokenized_str) == 0:
-            return torch.empty(self.dimension)
-        else:
-            return self.embedding(torch.tensor(self.vocab(tokenized_str)))
-'''
+
 class AttentionHead(nn.Module):
     def __init__(self, config: ParameterProvider, masked: bool = False, d_v_override: int = None, d_qk_override: int = None):
         super().__init__()
@@ -347,29 +328,6 @@ class CustomDataSet(Dataset):
         return torch.utils.data.random_split(self, [train_size, test_size])
 
 
-'''
-
-
-
-
-cd = CustomDataSet('simplepl.txt', 'simpleen.txt',v_out)
-
-
-
-
-train_dataset, test_dataset = cd.getSets()
-
-loader = iter(DataLoader(train_dataset, batch_size=1, shuffle=True))
-
-
-criterion = torch.nn.CrossEntropyLoss()
-
-
-lr = 1.0
-optimizer = torch.optim.SGD(t.parameters(), lr=lr)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
-
-'''
 
 def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1, criterion = torch.nn.CrossEntropyLoss()) -> None:
     model.train()

@@ -1,18 +1,9 @@
 import transformer as t
 import random
 from typing import List
-from numpy import average, number
-from sqlalchemy import false
-from sympy import numer
-import torch
-import torch.nn.functional as f
-from torch import inner, nn
-from torchtext.vocab import Vocab
-from torch import Tensor
+from torch import nn
 import math
-from torch.utils.data import Dataset, DataLoader
 import copy
-import numpy as np
 import threading
 from statistics import mean
 
