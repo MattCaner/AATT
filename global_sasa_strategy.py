@@ -5,7 +5,8 @@ from typing import List
 import math
 import copy
 import threading
-from smt.surrogate_models import SurrogateModel, RBF
+from smt.surrogate_models import RBF
+import numpy as np
 
 class Solution:
     def __init__(self, transformer: t.Transformer, result: float):
@@ -60,16 +61,18 @@ class AnnealingStrategyGlobalSasa():
         #new_fitness = t.evaluate(new_transformer,self.test_dataset)
         t.train_until_difference(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"))
         new_fitness = t.evaluate(new_transformer,self.test_dataset)
+        self.surrogate_archive.append(Solution(new_transformer,new_fitness))
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
         else:
             if random.uniform(0,1) < math.exp(-1.*(new_fitness - old_fitness) / T):
                 solutions[thread_number] = Solution(new_transformer,new_fitness)
 
-    def approximate(self, thread_number: int, surrogate: SurrogateModel, solutions: List[Solution], T: float, operationsMemory: List) -> None:
+    def approximate(self, thread_number: int, surrogate, solutions: List[Solution], T: float, operationsMemory: List) -> None:
         old_fitness = solutions[thread_number].result
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         new_fitness = surrogate.predict_values([new_transformer.config.getArray()])[0]
+
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
         else:
@@ -109,10 +112,10 @@ class AnnealingStrategyGlobalSasa():
             
             surrogation_valid = False
 
-            if i % self.t_train:
+            if i % self.t_train == 0 and i > self.t_train:
                 #create samples for surogation:
-                points_array = [s.transformer.config.getArray() for s in self.surrogate_archive]
-                results_array = [s.result for s in self.surrogate_archive]
+                points_array = np.array([s.transformer.config.getArray() for s in self.surrogate_archive])
+                results_array = np.array([s.result for s in self.surrogate_archive])
 
                 surrogate = RBF()
                 surrogate.set_training_values(points_array, results_array)
@@ -151,6 +154,6 @@ class AnnealingStrategyGlobalSasa():
 
 
 
-strategy = AnnealingStrategyGlobalSasa(num_threads=8,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
+strategy = AnnealingStrategyGlobalSasa(num_threads=8,t_train=3,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
 
 strategy.run()
