@@ -1,5 +1,6 @@
 import io
 from typing import List
+from xmlrpc.client import Boolean
 from numpy import number
 import torch
 from torch import nn
@@ -8,7 +9,7 @@ from torchtext.vocab import build_vocab_from_iterator
 from torch import Tensor
 import math
 import configparser
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import copy
 
 # custom util transformer entity
@@ -117,9 +118,6 @@ class ParameterProvider():
         return pp
 
 
-
-
-
 class VocabProvider():
     def __init__(self, config: ParameterProvider, vocabSourceFile: str):
         self.vocab = build_vocab_from_iterator(Utils.yield_tokens(vocabSourceFile), specials=["<unk>"])
@@ -133,18 +131,22 @@ class VocabProvider():
         return torch.tensor(self.vocab(text))
 
 class Embedder(nn.Module):
-    def __init__(self, config: ParameterProvider, vocab: VocabProvider):
+    def __init__(self, config: ParameterProvider, vocab: VocabProvider, use_string_input: Boolean = False):
         super().__init__()
         self.d_model = config.provide("d_model")
         self.embedding = nn.Embedding(vocab.getVocabLength(), self.d_model)
         self.vocab = vocab
+        self.use_string_input = use_string_input
     
-    def forward(self, text: str) -> Tensor:
-        tokenized_str = Utils.tokenize(text)
-        if len(tokenized_str) == 0:
-            return torch.empty(self.dimension)
+    def forward(self, text: any) -> Tensor:
+        if self.use_string_input:
+            tokenized_str = Utils.tokenize(text)
+            if len(tokenized_str) == 0:
+                return torch.empty(self.dimension)
+            else:
+                return self.embedding(self.vocab.getValues(tokenized_str))
         else:
-            return self.embedding(self.vocab.getValues(tokenized_str))
+            return self.embedding(text)
 
 class AttentionHead(nn.Module):
     def __init__(self, config: ParameterProvider, masked: bool = False, d_v_override: int = None, d_qk_override: int = None):
@@ -164,12 +166,13 @@ class AttentionHead(nn.Module):
         V = self.WV(input_v)
 
         if self.masked:
-            if Q.size(0) != K.size(0):
+            if Q.size(1) != K.size(1):
                 raise TypeError('Masking can be only performed when Querry and Key Matrices have the same sizes (i.e. their product is square)')
-            mask = torch.triu(torch.full((Q.size(0),Q.size(0)),-1*torch.inf),diagonal=1)
-            return torch.matmul(torch.softmax(torch.add(torch.matmul(Q,torch.transpose(K,0,1)),mask)/math.sqrt(self.d_model),dim=-1),V)
+            mask = torch.stack([torch.triu(torch.full((Q.size(1),Q.size(1)),-1*torch.inf),diagonal=1) for _ in range(Q.size(0))])
+            mask = mask.to(device=Q.device)
+            return torch.bmm(torch.softmax(torch.add(torch.bmm(Q,torch.transpose(K,1,2)),mask)/math.sqrt(self.d_model),dim=-1),V)
         else:
-            return torch.matmul(torch.softmax(torch.matmul(Q,torch.transpose(K,0,1))/math.sqrt(self.d_model),dim=-1),V)
+            return torch.bmm(torch.softmax(torch.bmm(Q,torch.transpose(K,1,2))/math.sqrt(self.d_model),dim=-1),V)
 
 
 class MultiHeadedAttention(nn.Module):
@@ -179,7 +182,7 @@ class MultiHeadedAttention(nn.Module):
         self.d_v = config.provide("d_v") if d_v_override is None else d_v_override
         self.d_qk = config.provide("d_qk") if d_qk_ovveride is None else d_qk_ovveride
         self.n_heads = config.provide("n_heads") if n_heads_override is None else n_heads_override
-        self.heads = [AttentionHead(config,masked=masked,d_qk_override=d_qk_ovveride,d_v_override=d_v_override) for _ in range(self.n_heads)]
+        self.heads = nn.ModuleList([AttentionHead(config,masked=masked,d_qk_override=d_qk_ovveride,d_v_override=d_v_override) for _ in range(self.n_heads)])
         self.linear = nn.Linear(self.d_v*self.n_heads,self.d_model)
         self.masked = masked
     
@@ -223,7 +226,7 @@ class EncoderStack(nn.Module):
     def __init__(self, config: ParameterProvider):
         super().__init__()
         self.n_encoders = config.provide("n_encoders")
-        self.encoders = [EncoderLayer(config) for _ in range(self.n_encoders)]
+        self.encoders = nn.ModuleList([EncoderLayer(config) for _ in range(self.n_encoders)])
     
     def forward(self, input_data: Tensor) -> Tensor:
         for l in self.encoders:
@@ -255,7 +258,7 @@ class DecoderStack(nn.Module):
     def __init__(self, config: ParameterProvider):
         super().__init__()
         self.n_decoders = config.provide("n_decoders")
-        self.decoders = [DecoderLayer(config) for _ in range(self.n_decoders)]
+        self.decoders = nn.ModuleList([DecoderLayer(config) for _ in range(self.n_decoders)])
     
     def forward(self, input_data: Tensor, ed_data: Tensor) -> Tensor:
         for l in self.decoders:
@@ -263,17 +266,18 @@ class DecoderStack(nn.Module):
         return input_data
 
 class Transformer(nn.Module):
-    def __init__(self, config: ParameterProvider, vocab_in: VocabProvider, vocab_out: VocabProvider):
+    def __init__(self, config: ParameterProvider, vocab_in: VocabProvider, vocab_out: VocabProvider, use_string_input = False):
         super().__init__()
         self.config = config
         self.d_model = config.provide("d_model")
-        self.vocab_in = vocab_in 
+        self.vocab_in = vocab_in
         config.change("vocab_in_size",self.vocab_in.getVocabLength())        
-        self.embedding_in = Embedder(config,self.vocab_in)
+        self.embedding_in = Embedder(config,self.vocab_in,use_string_input)
+        self.use_string_input = use_string_input
 
         self.vocab_out = vocab_out
         config.change("vocab_out_size",self.vocab_out.getVocabLength())
-        self.embedding_out = Embedder(config,self.vocab_out)
+        self.embedding_out = Embedder(config,self.vocab_out,use_string_input)
 
         self.encoder_stack = EncoderStack(config)
         self.decoder_stack = DecoderStack(config)
@@ -293,18 +297,31 @@ class Transformer(nn.Module):
         #return self.lexical_out(numerical)
 
 class CustomDataSet(Dataset):
-    def __init__(self, infile: str, outfile: str, vocab: VocabProvider):
+    def __init__(self, infile: str, outfile: str, vocab_in: VocabProvider, vocab_out: VocabProvider):
 
-        self.vocab = vocab
+        self.vocab_in = vocab_in
+        self.vocab_out = vocab_out
 
         fin = open(infile, "r",encoding = 'utf-8')
         fout = open(outfile,"r",encoding = 'utf-8')
         Xlines = list(map(str.lower,fin.readlines()))
         Ylines = list(map(str.lower,fout.readlines()))
-        self.X = [l[:-1] for l in Xlines]
-        self.Y = [l[:-1] for l in Ylines]
+
+        self.X = [self.vocab_in.getValues(Utils.tokenize(l[:-1])) for l in Xlines]
+        self.Y = [self.vocab_out.getValues(Utils.tokenize(l[:-1])) for l in Ylines]
         if len(self.X) != len(self.Y):
             raise Exception('Sets are of different sizes')
+        self.Z = []
+        for y in self.Y:
+            z = torch.zeros((len(y),vocab_out.getVocabLength()))
+            for i in range(len(y)):
+                z[i][int(y[i])] = 1.0
+            self.Z.append(z)        
+
+        self.X = torch.nn.utils.rnn.pad_sequence(self.X,batch_first=True)
+        self.Y = torch.nn.utils.rnn.pad_sequence(self.Y,batch_first=True)
+        self.Z = torch.nn.utils.rnn.pad_sequence(self.Z,batch_first=True)
+
         fin.close()
         fout.close()
 
@@ -314,12 +331,7 @@ class CustomDataSet(Dataset):
     def __getitem__(self, index):
         _x = self.X[index]
         _y = self.Y[index]
-        tokenized_str = Utils.tokenize(_y)
-        _z = torch.zeros((len(tokenized_str),self.vocab.getVocabLength()))
-        values = self.vocab.getValues(tokenized_str)
-        for i in range(len(tokenized_str)):
-            _z[i][int(values[i])] = 1.0
-        
+        _z = self.Z[index]
         return _x, _y, _z
 
     def getSets(self):
@@ -329,37 +341,81 @@ class CustomDataSet(Dataset):
 
 
 
-def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1, criterion = torch.nn.CrossEntropyLoss()) -> None:
-    model.train()
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batch_size = 32, lr: float = 0.1, epochs: int = 1) -> None:
     
-    #with torch.autograd.set_detect_anomaly(True):
-    total_loss = 0.
-    for i, value in enumerate(train_dataset):
-        data_in = value[0]
-        data_out = value[1]
-        data_out_numeric = value[2]
+    model.cuda(device=device)
+    criterion = nn.CrossEntropyLoss().cuda(device)
 
-        optimizer.zero_grad()
-        output = model(data_in,data_out)
-        loss = criterion(output,data_out_numeric)
-        loss.backward()
-        optimizer.step()
+    model.train()
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr,)
 
-        total_loss += loss.item()
+    data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    
+    last_loss = 0.
+    for epoch in range(epochs):
+
+        for i, (data_in, data_out, data_out_numeric) in enumerate(data_loader):
+            data_in = data_in.cuda(device)
+            data_out = data_out.cuda(device)
+            data_out_numeric = data_out_numeric.cuda(device)
+            optimizer.zero_grad()
+            output = model(data_in, data_out)
+            loss = criterion(output,data_out_numeric)
+            loss.backward()
+            optimizer.step()
+
+            last_loss = loss.item()
+
+    return last_loss
 
 
-def evaluate(model: nn.Module, test_dataset: CustomDataSet, criterion = torch.nn.CrossEntropyLoss()) -> float:
+
+def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
+
+    criterion = nn.CrossEntropyLoss()
+    if use_cuda:
+        criterion = nn.CrossEntropyLoss().cuda(device)
+        model.cuda(device)    
+    
     model.eval()
     total_loss = 0.
+
+    data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    
+
     with torch.no_grad():
-        for i, value in enumerate(test_dataset):
-            data_in = value[0]
-            data_out = value[1]
-            data_out_numeric = value[2]
+        for i, (data_in, data_out, data_out_numeric) in enumerate(data_loader):
+            if use_cuda:
+                data_in = data_in.cuda(device)
+                data_out = data_out.cuda(device)
+                data_out_numeric = data_out_numeric.cuda(device)
             output = model(data_in, data_out)
             total_loss += criterion(output, data_out_numeric).item() / data_out_numeric.size(0)
     return total_loss / (len(test_dataset))
+
+def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1) -> None:
+
+    optimizer = torch.optim.SGD(model.parameters(),lr=lr)
+    criterion = nn.CrossEntropyLoss()
+
+    total_loss = 0.
+    for _ in range(epochs):
+        for value in train_dataset:
+            data_in = value[0]
+            data_out = value[1]
+            data_out_numeric = value[2]
+
+
+            optimizer.zero_grad()
+            output = model(data_in,data_out)
+            loss = criterion(output,data_out_numeric)
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item() / epochs
+    
+    return total_loss
+
 
 def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss()) -> float:
     
