@@ -5,6 +5,7 @@ from typing import List
 import math
 import copy
 import threading
+from torch import cuda
 
 class Solution:
     def __init__(self, transformer: t.Transformer, result: float):
@@ -72,8 +73,8 @@ class AnnealingStrategyGlobal():
             transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
             #t.train(transformer,self.train_dataset,transformer.config.provide("learning_rate"),transformer.config.provide("epochs"))
             #result = t.evaluate(transformer,self.test_dataset)
-            t.train_until_difference(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"))
-            result = t.evaluate(transformer,self.test_dataset)
+            t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
+            result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
             s.append(Solution(transformer,result))
         return s
 
@@ -87,8 +88,6 @@ class AnnealingStrategyGlobal():
 
         global_best_index = max(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
         global_best_solution = solutions_list[global_best_index]
-
-
 
         for i in range(0,self.max_iters):
             print("annealing epoch: ",i, " temperature: ", temperature)
