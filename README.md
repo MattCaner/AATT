@@ -1,5 +1,7 @@
 # AATT
-AATT (Advanced Adaptive Transformer Topologies) is an experimental implementation of transformer network topologies optimization methods.
+AATT (Advanced Adaptive Transformer Topologies) is an experimental implementation of transformer network topologies optimization methods, including the use of:
+* Surrogate optimization
+* Simulated annealing
 
 This is my master thesis code.
 
