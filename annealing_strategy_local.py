@@ -6,7 +6,7 @@ import math
 import copy
 import threading
 from statistics import mean
-
+from torch import cuda
 
 def addRandomHead(transformer: t.Transformer) -> t.Transformer:
     total_attentions = len(transformer.encoder_stack.encoders) + 2*len(transformer.decoder_stack.decoders)
@@ -39,7 +39,7 @@ def removeRandomHead(transformer: t.Transformer) -> t.Transformer:
     if location < len(transformer.encoder_stack.encoders):
         if len(transformer.encoder_stack.encoders[location].mha.heads) > 1:
             random_head_id = random.randint(0,len(transformer.encoder_stack.encoders[location].mha.heads)-1)
-            transformer.encoder_stack.encoders[location].mha.heads.pop(random_head_id)
+            del transformer.encoder_stack.encoders[location].mha.heads[random_head_id]
             transformer.encoder_stack.encoders[location].mha.n_heads -= 1
             transformer.encoder_stack.encoders[location].mha.linear = nn.Linear(transformer.encoder_stack.encoders[location].mha.d_v*transformer.encoder_stack.encoders[location].mha.n_heads,transformer.encoder_stack.encoders[location].mha.d_model)
     else:
@@ -48,14 +48,14 @@ def removeRandomHead(transformer: t.Transformer) -> t.Transformer:
             location = int(location/2)
             if len(transformer.decoder_stack.decoders[location].self_mha.heads) > 1:
                 random_head_id = random.randint(0,len(transformer.decoder_stack.decoders[location].self_mha.heads)-1)
-                transformer.decoder_stack.decoders[location].self_mha.heads.pop(random_head_id)
+                del transformer.decoder_stack.decoders[location].self_mha.heads[random_head_id]
                 transformer.decoder_stack.decoders[location].self_mha.n_heads -= 1
                 transformer.decoder_stack.decoders[location].self_mha.linear = nn.Linear(transformer.decoder_stack.decoders[location].self_mha.d_v*transformer.decoder_stack.decoders[location].self_mha.n_heads,transformer.decoder_stack.decoders[location].self_mha.d_model)
         else:
             location = int(location/2)
             if len(transformer.decoder_stack.decoders[location].ed_mha.heads) > 1:
                 random_head_id = random.randint(0,len(transformer.decoder_stack.decoders[location].ed_mha.heads)-1)
-                transformer.decoder_stack.decoders[location].ed_mha.heads.pop(random_head_id)
+                del transformer.decoder_stack.decoders[location].ed_mha.heads[random_head_id]
                 transformer.decoder_stack.decoders[location].ed_mha.n_heads -= 1
                 transformer.decoder_stack.decoders[location].ed_mha.linear = nn.Linear(transformer.decoder_stack.decoders[location].ed_mha.d_v*transformer.decoder_stack.decoders[location].ed_mha.n_heads,transformer.decoder_stack.decoders[location].ed_mha.d_model)
 
@@ -145,7 +145,7 @@ def removeEncoder(transformer: t.Transformer) -> t.Transformer:
     # remove an encoder:
     if len(transformer.encoder_stack.encoders) > 1:
         encoder_to_remove = random.randint(0,len(transformer.encoder_stack.encoders)-1)
-        transformer.encoder_stack.encoders.pop(encoder_to_remove)
+        del transformer.encoder_stack.encoders[encoder_to_remove]
     return transformer
 
 def addDecoder(transformer: t.Transformer) -> t.Transformer:
@@ -158,7 +158,7 @@ def removeDecoder(transformer: t.Transformer) -> t.Transformer:
     # remove a decoder:
     if len(transformer.decoder_stack.decoders) > 1:
         decoder_to_remove = random.randint(0,len(transformer.decoder_stack.decoders)-1)
-        transformer.decoder_stack.decoders.pop(decoder_to_remove)
+        del transformer.decoder_stack.decoders[decoder_to_remove]
     return transformer
 
 mutations_table = [addRandomHead, removeRandomHead, changeDimensions, changeFFDimensions, addEncoder, addDecoder, removeDecoder]
@@ -182,7 +182,7 @@ class AnnealingStrategyLocal():
 
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
         self.v_out = t.VocabProvider(self.general_params,self.general_params.provide("language_out_file"))
-        self.cd = t.CustomDataSet(self.general_params.provide("language_in_file"), self.general_params.provide("language_out_file"),self.v_out)
+        self.cd = t.CustomDataSet(self.general_params.provide("language_in_file"), self.general_params.provide("language_out_file"),self.v_in,self.v_out)
         self.train_dataset, self.test_dataset = self.cd.getSets()
         if test_mode:
             self.test_dataset = self.train_dataset
@@ -208,8 +208,8 @@ class AnnealingStrategyLocal():
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
         #new_fitness = t.evaluate(new_transformer,self.test_dataset)
-        t.train_until_difference(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"))
-        new_fitness = t.evaluate(new_transformer,self.test_dataset)
+        t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
+        new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
         else:
@@ -226,8 +226,8 @@ class AnnealingStrategyLocal():
             transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
             #t.train(transformer,self.train_dataset,transformer.config.provide("learning_rate"),transformer.config.provide("epochs"))
             #result = t.evaluate(transformer,self.test_dataset)
-            t.train_until_difference(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=10)
-            result = t.evaluate(transformer,self.test_dataset)
+            t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
+            result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
             s.append(Solution(transformer,result))
             
         thread_list = [threading.Thread(target=generateSingleSolution) for th in range(0,self.num_threads)]
@@ -274,6 +274,5 @@ class AnnealingStrategyLocal():
 
 
 
-strategy = AnnealingStrategyLocal(num_threads=4,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
-
-strategy.run()
+#strategy = AnnealingStrategyLocal(num_threads=4,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config",test_mode=True)
+#strategy.run()

@@ -429,9 +429,9 @@ def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_d
             return new_result
     return new_result
 
-def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int = 0, batch_size = 32, min_difference = 0.001, lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss()) -> float:
+def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, device: int = 0, batch_size = 32,  lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss()) -> float:
     
-    new_result = evaluate(model,train_dataset)
+    new_result = evaluate(model,train_dataset, use_cuda=True, device=device, batch_size=batch_size)
     for i in range(0,max_epochs):
         old_result = new_result
         new_result = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)

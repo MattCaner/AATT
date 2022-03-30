@@ -25,7 +25,7 @@ class AnnealingStrategyGlobal():
 
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
         self.v_out = t.VocabProvider(self.general_params,self.general_params.provide("language_out_file"))
-        self.cd = t.CustomDataSet(self.general_params.provide("language_in_file"), self.general_params.provide("language_out_file"),self.v_out)
+        self.cd = t.CustomDataSet(self.general_params.provide("language_in_file"), self.general_params.provide("language_out_file"),self.v_in,self.v_out)
         self.train_dataset, self.test_dataset = self.cd.getSets()
         if test_mode:
             self.test_dataset = self.train_dataset
@@ -55,8 +55,8 @@ class AnnealingStrategyGlobal():
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
         #new_fitness = t.evaluate(new_transformer,self.test_dataset)
-        t.train_until_difference(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"))
-        new_fitness = t.evaluate(new_transformer,self.test_dataset)
+        t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
+        new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
         else:
@@ -112,6 +112,5 @@ class AnnealingStrategyGlobal():
 
 
 
-strategy = AnnealingStrategyGlobal(num_threads=8,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
-
-strategy.run()
+#strategy = AnnealingStrategyGlobal(num_threads=8,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
+#strategy.run()

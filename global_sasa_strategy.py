@@ -7,6 +7,7 @@ import copy
 import threading
 from smt.surrogate_models import RBF
 import numpy as np
+from torch import cuda
 
 class Solution:
     def __init__(self, transformer: t.Transformer, result: float):
@@ -59,8 +60,8 @@ class AnnealingStrategyGlobalSasa():
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
         #new_fitness = t.evaluate(new_transformer,self.test_dataset)
-        t.train_until_difference(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"))
-        new_fitness = t.evaluate(new_transformer,self.test_dataset)
+        t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
+        new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         self.surrogate_archive.append(Solution(new_transformer,new_fitness))
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
@@ -89,8 +90,8 @@ class AnnealingStrategyGlobalSasa():
             transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
             #t.train(transformer,self.train_dataset,transformer.config.provide("learning_rate"),transformer.config.provide("epochs"))
             #result = t.evaluate(transformer,self.test_dataset)
-            t.train_until_difference(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"))
-            result = t.evaluate(transformer,self.test_dataset)
+            t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
+            result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
             s.append(Solution(transformer,result))
         return s
 
@@ -154,6 +155,5 @@ class AnnealingStrategyGlobalSasa():
 
 
 
-strategy = AnnealingStrategyGlobalSasa(num_threads=8,t_train=3,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
-
-strategy.run()
+#strategy = AnnealingStrategyGlobalSasa(num_threads=8,t_train=3,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
+#strategy.run()
