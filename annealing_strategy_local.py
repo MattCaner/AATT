@@ -265,7 +265,7 @@ class AnnealingStrategyLocal():
 
             time_total = time.time() - time_start
 
-            best_solution_index = max(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
+            best_solution_index = min(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
 
 

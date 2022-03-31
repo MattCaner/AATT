@@ -390,7 +390,7 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
                 data_out = data_out.cuda(device)
                 data_out_numeric = data_out_numeric.cuda(device)
             output = model(data_in, data_out)
-            total_loss += criterion(output, data_out_numeric).item() / data_out_numeric.size(0)
+            total_loss += criterion(output, data_out_numeric).item()
     return total_loss / (len(test_dataset))
 
 def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1) -> None:
