@@ -6,6 +6,7 @@ import math
 import copy
 import threading
 from torch import cuda
+import time
 
 class Solution:
     def __init__(self, transformer: t.Transformer, result: float):
@@ -14,12 +15,13 @@ class Solution:
 
 class AnnealingStrategyGlobal():
 
-    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False):
+    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False, csv_output: str = 'out.csv'):
         self.num_threads = num_threads
         self.max_iters = max_iters
         self.best_update_interval = best_update_interval
         self.alpha = alpha
         self.solutions_list = []
+        self.csv_output = csv_output
 
         self.general_params = t.ParameterProvider(configFile)
 
@@ -80,6 +82,10 @@ class AnnealingStrategyGlobal():
 
     def run(self) -> None:
 
+        file = open(self.csv_output,'w')
+        file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time\n')
+        file.close()
+
         print("preparing initial solution")
         solutions_list = self.generateInitialSolutions()
         temperature = self.generateTemperature(solutions_list)
@@ -91,16 +97,29 @@ class AnnealingStrategyGlobal():
 
         for i in range(0,self.max_iters):
             print("annealing epoch: ",i, " temperature: ", temperature)
+
+            time_start = time.time()
+
             thread_list = [threading.Thread(target=self.performAnnealing, args=(th,solutions_list,temperature,operations_memory[th])) for th in range(0,self.num_threads)]
             for th in thread_list:
                 th.start()
             for th in thread_list:
                 th.join()
+
+            time_total = time.time() - time_start
             
             best_solution_index = max(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
+
+            average_solution = mean(i.result for i in solutions_list)
+            file = open(self.csv_output,'a')
+            file.write(str(i) + "," + str(best_solution.result) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "\n")
+            file.close()
+
+
             if best_solution.result < global_best_solution.result:
                 global_best_solution = best_solution
+
 
             print("best epoch result: ",best_solution.result)
 

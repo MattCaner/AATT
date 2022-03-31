@@ -7,6 +7,7 @@ import copy
 import threading
 from statistics import mean
 from torch import cuda
+import time
 
 def addRandomHead(transformer: t.Transformer) -> t.Transformer:
     total_attentions = len(transformer.encoder_stack.encoders) + 2*len(transformer.decoder_stack.decoders)
@@ -171,13 +172,13 @@ class Solution:
 
 class AnnealingStrategyLocal():
 
-    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False):
+    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False, csv_output: str = 'out.csv'):
         self.num_threads = num_threads
         self.max_iters = max_iters
         self.best_update_interval = best_update_interval
         self.alpha = alpha
         self.solutions_list = []
-
+        self.csv_output = csv_output
         self.general_params = t.ParameterProvider(configFile)
 
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
@@ -253,14 +254,27 @@ class AnnealingStrategyLocal():
 
         for i in range(0,self.max_iters):
             print("annealing epoch: ",i, " temperature: ", temperature)
+
+            time_start = time.time()        
+
             thread_list = [threading.Thread(target=self.performAnnealing, args=(th,solutions_list,temperature,operations_memory[th])) for th in range(0,self.num_threads)]
             for th in thread_list:
                 th.start()
             for th in thread_list:
                 th.join()
-            
+
+            time_total = time.time() - time_start
+
             best_solution_index = max(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
+
+
+            average_solution = mean(i.result for i in solutions_list)
+            file = open(self.csv_output,'a')
+            file.write(str(i) + "," + str(best_solution.result) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "\n")
+            file.close()
+
+
             if best_solution.result < global_best_solution.result:
                 global_best_solution = best_solution
 

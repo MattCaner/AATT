@@ -2,3 +2,4 @@ auxilary/
 *.xlf
 notes.txt
 __pycache__/
+*.csv

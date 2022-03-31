@@ -8,6 +8,7 @@ import threading
 from smt.surrogate_models import RBF
 import numpy as np
 from torch import cuda
+import time
 
 class Solution:
     def __init__(self, transformer: t.Transformer, result: float):
@@ -16,7 +17,7 @@ class Solution:
 
 class AnnealingStrategyGlobalSasa():
 
-    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , t_train: int, alpha: float, configFile: str, validity_threshold: float = 0.05, test_mode = False):
+    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , t_train: int, alpha: float, configFile: str, validity_threshold: float = 0.05, test_mode = False, csv_output: str = 'out.csv'):
         self.surrogate_archive = []
         self.num_threads = num_threads
         self.max_iters = max_iters
@@ -25,12 +26,13 @@ class AnnealingStrategyGlobalSasa():
         self.solutions_list = []
         self.t_train = t_train
         self.validity_threshold = validity_threshold
+        self.csv_output = csv_output
 
         self.general_params = t.ParameterProvider(configFile)
 
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
         self.v_out = t.VocabProvider(self.general_params,self.general_params.provide("language_out_file"))
-        self.cd = t.CustomDataSet(self.general_params.provide("language_in_file"), self.general_params.provide("language_out_file"),self.v_out)
+        self.cd = t.CustomDataSet(self.general_params.provide("language_in_file"), self.general_params.provide("language_out_file"),self.v_in,self.v_out)
         self.train_dataset, self.test_dataset = self.cd.getSets()
         if test_mode:
             self.test_dataset = self.train_dataset
@@ -97,6 +99,10 @@ class AnnealingStrategyGlobalSasa():
 
     def run(self) -> None:
 
+        file = open(self.csv_output,'w')
+        file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time\n')
+        file.close()
+
         print("preparing initial solution")
         solutions_list = self.generateInitialSolutions()
         temperature = self.generateTemperature(solutions_list)
@@ -108,10 +114,11 @@ class AnnealingStrategyGlobalSasa():
 
         for i in range(0,self.max_iters):
 
-
             print("annealing epoch: ",i, " temperature: ", temperature)
             
             surrogation_valid = False
+
+            time_start = time.time()
 
             if i % self.t_train == 0 and i > self.t_train:
                 #create samples for surogation:
@@ -140,12 +147,23 @@ class AnnealingStrategyGlobalSasa():
                 for th in thread_list:
                     th.join()
             
+            time_total = time.time() - time_start
+
+
             best_solution_index = max(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
+
+            average_solution = mean(i.result for i in solutions_list)
+
+            file = open(self.csv_output,'a')
+            file.write(str(i) + "," + str(best_solution) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "\n")
+            file.close()
+
             if best_solution.result < global_best_solution.result:
                 global_best_solution = best_solution
 
             print("best epoch result: ",best_solution.result)
+
 
             temperature *= self.alpha
 

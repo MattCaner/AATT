@@ -25,6 +25,8 @@ def dec2():
     for iter, shred in enumerate(data):
         if iter > l:
             break
+        if shred._attrs['original'].firstChild.data == '/2007-09-26/just-ahead-early-parliamentary-elections-ukraine' or shred._attrs['original'].firstChild.data == '/2007-10-03/political-crisis-georgia':
+            continue
         for i, v in enumerate(shred.getElementsByTagName("body")[0].getElementsByTagName("trans-unit")):
             if i < 2:
                 continue
@@ -43,8 +45,8 @@ def dec2():
     
 
 
-    file2 = open("benchmark_pl.txt","w",encoding = "utf-8")
-    file3 = open("benchmark_en.txt","w", encoding = "utf-8")
+    file2 = open("pl.txt","w",encoding = "utf-8")
+    file3 = open("en.txt","w", encoding = "utf-8")
 
     file2.writelines(lines1)
     file3.writelines(lines2)
