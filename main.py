@@ -11,7 +11,7 @@ def run_global():
     strategy.run()
 
 def run_local():
-    strategy = AnnealingStrategyLocal(num_threads=4,max_iters=50,best_update_interval=10,alpha=0.9,test_mode=True,configFile="benchmark.config",csv_output="local_out.csv")
+    strategy = AnnealingStrategyLocal(num_threads=8,max_iters=50,best_update_interval=10,alpha=0.9,test_mode=True,configFile="benchmark.config",csv_output="local_out.csv")
     strategy.run()
 
 run_global()

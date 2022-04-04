@@ -3,3 +3,4 @@ auxilary/
 notes.txt
 __pycache__/
 *.csv
+*.tmx

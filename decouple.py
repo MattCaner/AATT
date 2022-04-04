@@ -55,4 +55,35 @@ def dec2():
     file3.close()
 
 
-dec2()
+def dec3():
+
+    l = 20000
+
+    lines1 = []
+    lines2 = []
+
+    data = x.parse("de-en-text.tmx").getElementsByTagName("tmx")[0].getElementsByTagName("body")[0].getElementsByTagName("tu")
+    for iter, shred in enumerate(data):
+        if iter > l:
+            break
+        if len(shred.getElementsByTagName("seg")) < 2:
+            continue
+        de = shred.getElementsByTagName("tuv")[0].getElementsByTagName("seg")[0].firstChild.data.replace("\n"," ") + "\n"
+        en = shred.getElementsByTagName("tuv")[1].getElementsByTagName("seg")[0].firstChild.data.replace("\n"," ") + "\n"
+
+        lines1.append(de)
+        lines2.append(en)
+
+    
+
+
+    file2 = open("german.txt","w",encoding = "utf-8")
+    file3 = open("english.txt","w", encoding = "utf-8")
+
+    file2.writelines(lines1)
+    file3.writelines(lines2)
+
+    file2.close()
+    file3.close()
+
+dec3()
