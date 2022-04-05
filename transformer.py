@@ -439,6 +439,6 @@ def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, 
         #new_result = evaluate(model,train_dataset,use_cuda=True,device=device,batch_size=batch_size)
         difference = (old_result - new_result) / old_result
         if abs(difference) < min_difference:
-            return new_result
+            return new_result, result_epochs
 
     return new_result, result_epochs
