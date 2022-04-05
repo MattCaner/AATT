@@ -58,8 +58,8 @@ class AnnealingStrategyGlobal():
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
         #new_fitness = t.evaluate(new_transformer,self.test_dataset)
-        t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
-        new_fitness, epochs = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
+        res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
+        new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         self.epochs_number[thread_number] = epochs
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
