@@ -18,6 +18,9 @@ def run_local():
     strategy = AnnealingStrategyLocal(num_threads=8,max_iters=50,best_update_interval=10,alpha=0.9,test_mode=False,configFile=configpath,csv_output=outpath+"/local_out.csv")
     strategy.run()
 
-run_global()
-run_local()
-run_global_sasa()
+#run_global()
+#run_local()
+#run_global_sasa()
+
+strategy = AnnealingStrategyGlobal(num_threads=8,max_iters=50,best_update_interval=10,alpha=0.9,test_mode=False,configFile=configpath,csv_output=outpath+"/global_out.csv")
+strategy.run()

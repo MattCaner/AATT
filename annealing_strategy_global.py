@@ -21,6 +21,7 @@ class AnnealingStrategyGlobal():
         self.best_update_interval = best_update_interval
         self.alpha = alpha
         self.solutions_list = []
+        self.epochs_number = []
         self.csv_output = csv_output
 
         self.general_params = t.ParameterProvider(configFile)
@@ -58,7 +59,8 @@ class AnnealingStrategyGlobal():
         #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
         #new_fitness = t.evaluate(new_transformer,self.test_dataset)
         t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
-        new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
+        new_fitness, epochs = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
+        self.epochs_number[thread_number] = epochs
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
         else:
@@ -83,7 +85,7 @@ class AnnealingStrategyGlobal():
     def run(self) -> None:
 
         file = open(self.csv_output,'w')
-        file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time\n')
+        file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time, Epochs performed\n')
         file.close()
 
         print("preparing initial solution")
@@ -100,6 +102,8 @@ class AnnealingStrategyGlobal():
 
             time_start = time.time()
 
+            self.epochs_numbers = [0 for _ in range(self.num_threads)]
+
             thread_list = [threading.Thread(target=self.performAnnealing, args=(th,solutions_list,temperature,operations_memory[th])) for th in range(0,self.num_threads)]
             for th in thread_list:
                 th.start()
@@ -113,7 +117,7 @@ class AnnealingStrategyGlobal():
 
             average_solution = mean(i.result for i in solutions_list)
             file = open(self.csv_output,'a')
-            file.write(str(i) + "," + str(best_solution.result) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "\n")
+            file.write(str(i) + "," + str(best_solution.result) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "," + str(sum(self.epochs_number)) + "\n")
             file.close()
 
 
