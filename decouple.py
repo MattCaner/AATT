@@ -57,7 +57,7 @@ def dec2():
 
 def dec3():
 
-    l = 20000
+    l = 100
 
     lines1 = []
     lines2 = []

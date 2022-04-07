@@ -309,6 +309,8 @@ class CustomDataSet(Dataset):
 
         self.X = [self.vocab_in.getValues(Utils.tokenize(l[:-1])) for l in Xlines]
         self.Y = [self.vocab_out.getValues(Utils.tokenize(l[:-1])) for l in Ylines]
+        self.LX = [len(l) for l in self.X]
+        self.LY = [len(l) for l in self.Y]
         if len(self.X) != len(self.Y):
             raise Exception('Sets are of different sizes')
         self.Z = []
@@ -332,7 +334,9 @@ class CustomDataSet(Dataset):
         _x = self.X[index]
         _y = self.Y[index]
         _z = self.Z[index]
-        return _x, _y, _z
+        _lx = self.LX[index]
+        _ly = self.LY[index]
+        return _x, _y, _z, _lx, _ly
 
     def getSets(self):
         train_size = int(0.8 * len(self))
@@ -344,7 +348,7 @@ class CustomDataSet(Dataset):
 def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batch_size = 32, lr: float = 0.1, epochs: int = 1) -> None:
     
     model.cuda(device=device)
-    criterion = nn.CrossEntropyLoss().cuda(device)
+    criterion = nn.CrossEntropyLoss(reduction="sum").cuda(device)
 
     model.train()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr,)
@@ -354,7 +358,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
     last_loss = 0.
     for epoch in range(epochs):
 
-        for i, (data_in, data_out, data_out_numeric) in enumerate(data_loader):
+        for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
             data_in = data_in.cuda(device)
             data_out = data_out.cuda(device)
             data_out_numeric = data_out_numeric.cuda(device)
@@ -364,7 +368,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             loss.backward()
             optimizer.step()
 
-            last_loss = loss.item()
+            last_loss = loss.item() / sum(len_out)
 
     return last_loss
 
@@ -372,9 +376,9 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(reduction='sum')
     if use_cuda:
-        criterion = nn.CrossEntropyLoss().cuda(device)
+        criterion = nn.CrossEntropyLoss(reduction='sum').cuda(device)
         model.cuda(device)    
     
     model.eval()
@@ -384,13 +388,13 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
     
 
     with torch.no_grad():
-        for i, (data_in, data_out, data_out_numeric) in enumerate(data_loader):
+        for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
             if use_cuda:
                 data_in = data_in.cuda(device)
                 data_out = data_out.cuda(device)
                 data_out_numeric = data_out_numeric.cuda(device)
             output = model(data_in, data_out)
-            total_loss += criterion(output, data_out_numeric).item()
+            total_loss += criterion(output, data_out_numeric).item() / sum(len_out)
     return total_loss / (len(test_dataset))
 
 def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1) -> None:
@@ -416,7 +420,6 @@ def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epoch
     
     return total_loss
 
-
 def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss()) -> float:
     
     new_result = evaluate(model,train_dataset)
@@ -429,7 +432,7 @@ def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_d
             return new_result
     return new_result
 
-def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, device: int = 0, batch_size = 32,  lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss()) -> float:
+def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, device: int = 0, batch_size = 32,  lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss(reduction='sum')) -> float:
     result_epochs = 0
     new_result = evaluate(model,train_dataset, use_cuda=True, device=device, batch_size=batch_size)
     for i in range(0,max_epochs):

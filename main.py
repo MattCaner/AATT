@@ -3,7 +3,7 @@ from annealing_strategy_global import AnnealingStrategyGlobal
 from annealing_strategy_local import AnnealingStrategyLocal
 import os
 
-configpath = os.environ["SCRATCH"] + "/benchmark.config"
+configpath = os.environ["SCRATCH"] + "/params.config"
 outpath = os.environ["SCRATCH"]
 '''
 def run_global_sasa():
