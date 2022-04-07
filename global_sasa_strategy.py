@@ -56,15 +56,13 @@ class AnnealingStrategyGlobalSasa():
         
         return newtransformer
 
-    def performAnnealing(self, thread_number: int, solutions: List[Solution], T: float, operationsMemory: List) -> None:
-        #print("Started thread: ", thread_number)
+    def performAnnealing(self, thread_number: int, solutions: List[Solution], epochs_number: List[int], T: float, operationsMemory: List) -> None:
         old_fitness = solutions[thread_number].result
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
-        #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
-        #new_fitness = t.evaluate(new_transformer,self.test_dataset)
-        t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
+        res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
         new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         self.surrogate_archive.append(Solution(new_transformer,new_fitness))
+        epochs_number[thread_number] = epochs
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
         else:
@@ -90,8 +88,6 @@ class AnnealingStrategyGlobalSasa():
         s = []
         for _ in range(self.num_threads):
             transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
-            #t.train(transformer,self.train_dataset,transformer.config.provide("learning_rate"),transformer.config.provide("epochs"))
-            #result = t.evaluate(transformer,self.test_dataset)
             t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
             result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
             s.append(Solution(transformer,result))
@@ -100,7 +96,7 @@ class AnnealingStrategyGlobalSasa():
     def run(self) -> None:
 
         file = open(self.csv_output,'w')
-        file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time\n')
+        file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time, Epochs\n')
         file.close()
 
         print("preparing initial solution")
@@ -141,7 +137,8 @@ class AnnealingStrategyGlobalSasa():
                         th.join()
 
             if surrogation_valid == False:
-                thread_list = [threading.Thread(target=self.performAnnealing, args=(th,solutions_list,temperature,operations_memory[th])) for th in range(0,self.num_threads)]
+                epochs_number = [0 for _ in range(self.num_threads)]
+                thread_list = [threading.Thread(target=self.performAnnealing, args=(th,solutions_list, epochs_number,temperature,operations_memory[th])) for th in range(0,self.num_threads)]
                 for th in thread_list:
                     th.start()
                 for th in thread_list:
@@ -156,7 +153,7 @@ class AnnealingStrategyGlobalSasa():
             average_solution = mean(i.result for i in solutions_list)
 
             file = open(self.csv_output,'a')
-            file.write(str(i) + "," + str(best_solution) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "\n")
+            file.write(str(i) + "," + str(best_solution) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "," + str(sum(epochs_number)) + "\n")
             file.close()
 
             if best_solution.result < global_best_solution.result:

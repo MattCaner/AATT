@@ -204,13 +204,12 @@ class AnnealingStrategyLocal():
 
         return newtransformer
 
-    def performAnnealing(self, thread_number: int, solutions: List[Solution], T: float, operationsMemory: List) -> None:
+    def performAnnealing(self, thread_number: int, solutions: List[Solution], epochs_number: List[int], T: float, operationsMemory: List) -> None:
         old_fitness = solutions[thread_number].result
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
-        #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
-        #new_fitness = t.evaluate(new_transformer,self.test_dataset)
-        t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
+        res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
         new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
+        epochs_number[thread_number] = epochs
         if new_fitness < old_fitness:
             solutions[thread_number] = Solution(new_transformer,new_fitness)
         else:
@@ -220,13 +219,10 @@ class AnnealingStrategyLocal():
     def generateTemperature(self,initial_solutions: List) -> float:
         return mean(i.result for i in initial_solutions)
 
-    #mostly placeholder
     def generateInitialSolutions(self) -> List[Solution]:
         s = []
         def generateSingleSolution():
             transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
-            #t.train(transformer,self.train_dataset,transformer.config.provide("learning_rate"),transformer.config.provide("epochs"))
-            #result = t.evaluate(transformer,self.test_dataset)
             t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
             result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
             s.append(Solution(transformer,result))
@@ -251,13 +247,17 @@ class AnnealingStrategyLocal():
         global_best_solution = solutions_list[global_best_index]
 
 
+        file = open(self.csv_output,'w')
+        file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time, Epochs performed\n')
+        file.close()
 
         for i in range(0,self.max_iters):
             print("annealing epoch: ",i, " temperature: ", temperature)
 
             time_start = time.time()        
+            epochs_number = [0 for _ in range(self.num_threads)]
 
-            thread_list = [threading.Thread(target=self.performAnnealing, args=(th,solutions_list,temperature,operations_memory[th])) for th in range(0,self.num_threads)]
+            thread_list = [threading.Thread(target=self.performAnnealing, args=(th,solutions_list, epochs_number,temperature,operations_memory[th])) for th in range(0,self.num_threads)]
             for th in thread_list:
                 th.start()
             for th in thread_list:
@@ -271,7 +271,7 @@ class AnnealingStrategyLocal():
 
             average_solution = mean(i.result for i in solutions_list)
             file = open(self.csv_output,'a')
-            file.write(str(i) + "," + str(best_solution.result) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "\n")
+            file.write(str(i) + "," + str(best_solution.result) + "," + str(average_solution) + ", " + str(temperature) + "," + str(time_total) + "," + str(sum(epochs_number)) + "\n")
             file.close()
 
 
@@ -286,7 +286,3 @@ class AnnealingStrategyLocal():
                 for j in range(self.num_threads):
                     solutions_list[j] = global_best_solution
 
-
-
-#strategy = AnnealingStrategyLocal(num_threads=4,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config",test_mode=True)
-#strategy.run()

@@ -55,8 +55,6 @@ class AnnealingStrategyGlobal():
         #print("Started thread: ", thread_number)
         old_fitness = solutions[thread_number].result
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
-        #t.train(new_transformer,self.train_dataset,new_transformer.config.provide("learning_rate"),new_transformer.config.provide("epochs"))
-        #new_fitness = t.evaluate(new_transformer,self.test_dataset)
         res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
         new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         epochs_number[thread_number] = epochs
@@ -74,8 +72,6 @@ class AnnealingStrategyGlobal():
         s = []
         for _ in range(self.num_threads):
             transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
-            #t.train(transformer,self.train_dataset,transformer.config.provide("learning_rate"),transformer.config.provide("epochs"))
-            #result = t.evaluate(transformer,self.test_dataset)
             t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
             result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
             s.append(Solution(transformer,result))
@@ -123,7 +119,6 @@ class AnnealingStrategyGlobal():
             if best_solution.result < global_best_solution.result:
                 global_best_solution = best_solution
 
-
             print("best epoch result: ",best_solution.result)
 
             temperature *= self.alpha
@@ -132,7 +127,3 @@ class AnnealingStrategyGlobal():
                 for j in range(self.num_threads):
                     solutions_list[j] = global_best_solution
 
-
-
-#strategy = AnnealingStrategyGlobal(num_threads=8,max_iters=50,best_update_interval=10,alpha=0.9,configFile="benchmark.config")
-#strategy.run()
