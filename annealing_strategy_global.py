@@ -7,6 +7,7 @@ import copy
 import threading
 from torch import cuda
 import time
+import pickle
 
 class Solution:
     def __init__(self, transformer: t.Transformer, result: float):
@@ -15,13 +16,14 @@ class Solution:
 
 class AnnealingStrategyGlobal():
 
-    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False, csv_output: str = 'out.csv'):
+    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False, csv_output: str = 'out.csv', result_output: str = 'result'):
         self.num_threads = num_threads
         self.max_iters = max_iters
         self.best_update_interval = best_update_interval
         self.alpha = alpha
         self.epochs_number = []
         self.csv_output = csv_output
+        self.result_output = result_output
 
         self.general_params = t.ParameterProvider(configFile)
 
@@ -52,7 +54,6 @@ class AnnealingStrategyGlobal():
         return newtransformer
 
     def performAnnealing(self, thread_number: int, solutions: List[Solution], epochs_number: List[int], T: float, operationsMemory: List) -> None:
-        #print("Started thread: ", thread_number)
         old_fitness = solutions[thread_number].result
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
@@ -109,6 +110,10 @@ class AnnealingStrategyGlobal():
             
             best_solution_index = min(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
+            bestfile = open(str(self.result_output) + '-epoch' + str(i) + '.pydump','w')
+            pickle.dump(best_solution,bestfile)
+            bestfile.close()
+
 
             average_solution = mean(i.result for i in solutions_list)
             file = open(self.csv_output,'a')

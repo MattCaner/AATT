@@ -1,4 +1,5 @@
 from statistics import mean
+from unittest import result
 import transformer as t
 import random
 from typing import List
@@ -9,6 +10,7 @@ from smt.surrogate_models import RBF
 import numpy as np
 from torch import cuda
 import time
+import pickle
 
 class Solution:
     def __init__(self, transformer: t.Transformer, result: float):
@@ -17,7 +19,7 @@ class Solution:
 
 class AnnealingStrategyGlobalSasa():
 
-    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , t_train: int, alpha: float, configFile: str, validity_threshold: float = 0.05, test_mode = False, csv_output: str = 'out.csv'):
+    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , t_train: int, alpha: float, configFile: str, validity_threshold: float = 0.05, test_mode = False, csv_output: str = 'out.csv', result_output: str = 'result'):
         self.surrogate_archive = []
         self.num_threads = num_threads
         self.max_iters = max_iters
@@ -27,6 +29,7 @@ class AnnealingStrategyGlobalSasa():
         self.t_train = t_train
         self.validity_threshold = validity_threshold
         self.csv_output = csv_output
+        self.result_output = result_output
 
         self.general_params = t.ParameterProvider(configFile)
 
@@ -149,6 +152,9 @@ class AnnealingStrategyGlobalSasa():
 
             best_solution_index = min(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
+            bestfile = open(str(self.result_output) + '-epoch' + str(i) + '.pydump','w')
+            pickle.dump(best_solution,bestfile)
+            bestfile.close()
 
             average_solution = mean(i.result for i in solutions_list)
 

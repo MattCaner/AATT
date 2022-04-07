@@ -1,3 +1,4 @@
+from unittest import result
 import transformer as t
 import random
 from typing import List
@@ -8,6 +9,7 @@ import threading
 from statistics import mean
 from torch import cuda
 import time
+import pickle
 
 def addRandomHead(transformer: t.Transformer) -> t.Transformer:
     total_attentions = len(transformer.encoder_stack.encoders) + 2*len(transformer.decoder_stack.decoders)
@@ -172,7 +174,7 @@ class Solution:
 
 class AnnealingStrategyLocal():
 
-    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False, csv_output: str = 'out.csv'):
+    def __init__(self, num_threads: int, max_iters: int, best_update_interval: int , alpha: float, configFile: str, test_mode = False, csv_output: str = 'out.csv', result_output: str = 'result'):
         self.num_threads = num_threads
         self.max_iters = max_iters
         self.best_update_interval = best_update_interval
@@ -180,6 +182,7 @@ class AnnealingStrategyLocal():
         self.solutions_list = []
         self.csv_output = csv_output
         self.general_params = t.ParameterProvider(configFile)
+        self.result_output = result_output
 
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
         self.v_out = t.VocabProvider(self.general_params,self.general_params.provide("language_out_file"))
@@ -267,6 +270,9 @@ class AnnealingStrategyLocal():
 
             best_solution_index = min(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
+            bestfile = open(str(self.result_output) + '-epoch' + str(i) + '.pydump','w')
+            pickle.dump(best_solution,bestfile)
+            bestfile.close()
 
 
             average_solution = mean(i.result for i in solutions_list)
