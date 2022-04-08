@@ -348,7 +348,7 @@ class CustomDataSet(Dataset):
 def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batch_size = 32, lr: float = 0.1, epochs: int = 1) -> None:
     
     model.cuda(device=device)
-    criterion = nn.CrossEntropyLoss(reduction="sum").cuda(device)
+    criterion = nn.CrossEntropyLoss(reduction="mean").cuda(device)
 
     model.train()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr,)
@@ -364,8 +364,9 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             data_out_numeric = data_out_numeric.cuda(device)
             optimizer.zero_grad()
             output = model(data_in, data_out)
-            loss = criterion(output,data_out_numeric) / sum(len_out)
+            loss = criterion(output,data_out_numeric) * (data_out_numeric.size(0) * data_out_numeric.size(1)) / sum(len_out) #/ sum(len_out)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
 
             last_loss = loss.item() / sum(len_out)
@@ -378,7 +379,7 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
 
     criterion = nn.CrossEntropyLoss(reduction='mean')
     if use_cuda:
-        criterion = nn.CrossEntropyLoss(reduction='sum').cuda(device)
+        criterion = nn.CrossEntropyLoss(reduction='mean').cuda(device)
         model.cuda(device)    
     
     model.eval()
@@ -394,7 +395,7 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
                 data_out = data_out.cuda(device)
                 data_out_numeric = data_out_numeric.cuda(device)
             output = model(data_in, data_out)
-            total_loss += criterion(output, data_out_numeric).item() / sum(len_out)
+            total_loss += criterion(output, data_out_numeric) * (data_out_numeric.size(0) * data_out_numeric.size(1)) / sum(len_out) #.item() / sum(len_out)
     return total_loss.item() / len(test_dataset)
 
 def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1) -> None:
