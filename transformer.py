@@ -313,12 +313,15 @@ class CustomDataSet(Dataset):
         self.LY = [len(l) for l in self.Y]
         if len(self.X) != len(self.Y):
             raise Exception('Sets are of different sizes')
-        self.Z = []
+        self.Z = self.Y
+
+        '''
         for y in self.Y:
             z = torch.zeros((len(y),vocab_out.getVocabLength()))
             for i in range(len(y)):
                 z[i][int(y[i])] = 1.0
-            self.Z.append(z)        
+            self.Z.append(z)
+        '''
 
         self.X = torch.nn.utils.rnn.pad_sequence(self.X,batch_first=True)
         self.Y = torch.nn.utils.rnn.pad_sequence(self.Y,batch_first=True)
@@ -355,6 +358,8 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
     data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     
+    ntokens = model.vocab_out.getVocabLength()
+
     last_loss = 0.
     for epoch in range(epochs):
 
@@ -364,7 +369,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             data_out_numeric = data_out_numeric.cuda(device)
             optimizer.zero_grad()
             output = model(data_in, data_out)
-            loss = criterion(output,data_out_numeric) * (data_out_numeric.size(0) * data_out_numeric.size(1)) / sum(len_out) #/ sum(len_out)
+            loss = criterion(output.view(-1, ntokens),data_out.view(-1))
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
@@ -372,7 +377,6 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             last_loss = loss.item() / sum(len_out)
 
     return last_loss
-
 
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
@@ -387,6 +391,7 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
 
     data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
     
+    ntokens = model.vocab_out.getVocabLength()
 
     with torch.no_grad():
         for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
@@ -395,8 +400,23 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
                 data_out = data_out.cuda(device)
                 data_out_numeric = data_out_numeric.cuda(device)
             output = model(data_in, data_out)
-            total_loss += criterion(output, data_out_numeric) * (data_out_numeric.size(0) * data_out_numeric.size(1)) / sum(len_out) #.item() / sum(len_out)
+            total_loss += criterion(output.view(-1, ntokens), data_out.view(-1))
     return total_loss.item() / len(test_dataset)
+
+
+
+def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, device: int = 0, batch_size = 32,  lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss(reduction='sum')) -> float:
+    result_epochs = 0
+    new_result = evaluate(model,train_dataset, use_cuda=True, device=device, batch_size=batch_size)
+    for i in range(0,max_epochs):
+        result_epochs += 1
+        old_result = new_result
+        new_result = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)
+        difference = (old_result - new_result) / old_result
+        if abs(difference) < min_difference:
+            return new_result, result_epochs
+
+    return new_result, result_epochs
 
 def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1) -> None:
 
@@ -413,7 +433,7 @@ def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epoch
 
             optimizer.zero_grad()
             output = model(data_in,data_out)
-            loss = criterion(output,data_out_numeric)
+            loss = criterion(output,data_out)
             loss.backward()
             optimizer.step()
 
@@ -432,16 +452,3 @@ def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_d
         if abs(difference) < min_difference:
             return new_result
     return new_result
-
-def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, min_difference = 0.001, device: int = 0, batch_size = 32,  lr: float = 0.1, max_epochs: int = 50, criterion = torch.nn.CrossEntropyLoss(reduction='sum')) -> float:
-    result_epochs = 0
-    new_result = evaluate(model,train_dataset, use_cuda=True, device=device, batch_size=batch_size)
-    for i in range(0,max_epochs):
-        result_epochs += 1
-        old_result = new_result
-        new_result = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)
-        difference = (old_result - new_result) / old_result
-        if abs(difference) < min_difference:
-            return new_result, result_epochs
-
-    return new_result, result_epochs
