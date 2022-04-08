@@ -351,7 +351,7 @@ class CustomDataSet(Dataset):
 def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batch_size = 32, lr: float = 0.1, epochs: int = 1) -> None:
     
     model.cuda(device=device)
-    criterion = nn.CrossEntropyLoss(reduction="mean").cuda(device)
+    criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
 
     model.train()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr,)
@@ -381,9 +381,9 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
 
-    criterion = nn.CrossEntropyLoss(reduction='mean')
+    criterion = nn.CrossEntropyLoss(reduction='mean',ignore_index=0)
     if use_cuda:
-        criterion = nn.CrossEntropyLoss(reduction='mean').cuda(device)
+        criterion = nn.CrossEntropyLoss(reduction='mean',ignore_index=0).cuda(device)
         model.cuda(device)    
     
     model.eval()
