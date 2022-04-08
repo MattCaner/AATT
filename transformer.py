@@ -364,7 +364,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             data_out_numeric = data_out_numeric.cuda(device)
             optimizer.zero_grad()
             output = model(data_in, data_out)
-            loss = criterion(output,data_out_numeric)
+            loss = criterion(output,data_out_numeric) / sum(len_out)
             loss.backward()
             optimizer.step()
 
@@ -376,7 +376,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
 
-    criterion = nn.CrossEntropyLoss(reduction='sum')
+    criterion = nn.CrossEntropyLoss(reduction='mean')
     if use_cuda:
         criterion = nn.CrossEntropyLoss(reduction='sum').cuda(device)
         model.cuda(device)    
@@ -395,7 +395,7 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
                 data_out_numeric = data_out_numeric.cuda(device)
             output = model(data_in, data_out)
             total_loss += criterion(output, data_out_numeric).item() / sum(len_out)
-    return total_loss / (len(test_dataset))
+    return total_loss.item() / len(test_dataset)
 
 def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1) -> None:
 
@@ -439,7 +439,6 @@ def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, 
         result_epochs += 1
         old_result = new_result
         new_result = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)
-        #new_result = evaluate(model,train_dataset,use_cuda=True,device=device,batch_size=batch_size)
         difference = (old_result - new_result) / old_result
         if abs(difference) < min_difference:
             return new_result, result_epochs

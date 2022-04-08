@@ -68,7 +68,6 @@ class AnnealingStrategyGlobal():
     def generateTemperature(self,initial_solutions: List) -> float:
         return mean(i.result for i in initial_solutions)
 
-    #mostly placeholder
     def generateInitialSolutions(self) -> List[Solution]:
         s = []
         for _ in range(self.num_threads):
@@ -110,7 +109,7 @@ class AnnealingStrategyGlobal():
             
             best_solution_index = min(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
             best_solution = solutions_list[best_solution_index]
-            bestfile = open(str(self.result_output) + '-epoch' + str(i) + '.pydump','w')
+            bestfile = open(str(self.result_output) + '-epoch' + str(i) + '.pydump','wb')
             pickle.dump(best_solution,bestfile)
             bestfile.close()
 
