@@ -86,7 +86,7 @@ class ParameterProvider():
             "n_encoders": arr[4],
             "n_decoders": arr[5],
             "n_heads": arr[6],
-            "epochs": arr[7],
+            #"n_epochs": arr[7],
             "learning_rate": self.dictionary["learning_rate"],
             "language_in_file": self.dictionary["language_in_file"],
             "language_out_file": self.dictionary["language_out_file"],
@@ -103,7 +103,7 @@ class ParameterProvider():
             self.dictionary["n_encoders"],
             self.dictionary["n_decoders"],
             self.dictionary["n_heads"],
-            self.dictionary["epochs"],
+            #self.dictionary["epochs"],
         ]
 
     def provide(self, key: str) -> any:
@@ -147,6 +147,27 @@ class Embedder(nn.Module):
                 return self.embedding(self.vocab.getValues(tokenized_str))
         else:
             return self.embedding(text)
+
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, config: ParameterProvider):
+        super().__init__()
+        self.d_model = config.provide('d_model')
+        self.n = 10000
+    
+
+    def forward(self, input_x: Tensor) -> Tensor:
+
+        seq_len = input_x.size(1)
+        pe = torch.zeros(seq_len, self.d_model)
+        for k in range(seq_len):
+            for i in range(int(self.d_model/2)):
+                denominator = math.pow(self.n, 2*i/self.d_model)
+                pe[k, 2*i] = math.sin(k/denominator)
+                pe[k, 2*i+1] = math.cos(k/denominator)
+        pe = torch.stack([pe for _ in range(input_x.size(0))])
+        pe = pe.to(device=input_x.device)
+        return input_x + pe
 
 class AttentionHead(nn.Module):
     def __init__(self, config: ParameterProvider, masked: bool = False, d_v_override: int = None, d_qk_override: int = None):
@@ -273,11 +294,13 @@ class Transformer(nn.Module):
         self.vocab_in = vocab_in
         config.change("vocab_in_size",self.vocab_in.getVocabLength())        
         self.embedding_in = Embedder(config,self.vocab_in,use_string_input)
+        self.pos_encoding_in = PositionalEncoding(config)
         self.use_string_input = use_string_input
 
         self.vocab_out = vocab_out
         config.change("vocab_out_size",self.vocab_out.getVocabLength())
         self.embedding_out = Embedder(config,self.vocab_out,use_string_input)
+        self.pos_encoding_out = PositionalEncoding(config)
 
         self.encoder_stack = EncoderStack(config)
         self.decoder_stack = DecoderStack(config)
@@ -287,10 +310,11 @@ class Transformer(nn.Module):
 
     def forward(self, encoder_input: str, decoder_input: str):
         in_embedded = self.embedding_in(encoder_input)
-
+        in_embedded = self.pos_encoding_in(in_embedded)
         encoder_out = self.encoder_stack(in_embedded)
 
         out_embedded = self.embedding_out(decoder_input)
+        out_embedded = self.pos_encoding_out(out_embedded)
         decoder_out = self.decoder_stack(out_embedded,encoder_out)
         numerical = self.numerical_out(decoder_out)
         return numerical
