@@ -2,14 +2,14 @@
 import transformer as t
 import torch
 
-general_params = t.ParameterProvider("params.config")
+general_params = t.ParameterProvider("benchmark.config")
 
 v_in = t.VocabProvider(general_params,general_params.provide("language_in_file"))
 v_out = t.VocabProvider(general_params,general_params.provide("language_out_file"))
 cd = t.CustomDataSet(general_params.provide("language_in_file"), general_params.provide("language_out_file"),v_in,v_out)
 train_dataset, test_dataset = cd.getSets()
 
-transformer = t.Transformer()
+transformer = t.Transformer(general_params,v_in,v_out)
 
 for i in range(0,50):
     t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = 1, epochs = 10)
