@@ -184,9 +184,17 @@ class AnnealingStrategyLocal():
         self.general_params = t.ParameterProvider(configFile)
         self.result_output = result_output
 
+        print("Creating vocabularies")
+
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
         self.v_out = t.VocabProvider(self.general_params,self.general_params.provide("language_out_file"))
+        
+        print("Vocabularies created.")
+        
         self.cd = t.CustomDataSet(self.general_params.provide("language_in_file"), self.general_params.provide("language_out_file"),self.v_in,self.v_out)
+        
+        print("Dataset created.")
+        
         self.train_dataset, self.test_dataset = self.cd.getSets()
         if test_mode:
             self.test_dataset = self.train_dataset
