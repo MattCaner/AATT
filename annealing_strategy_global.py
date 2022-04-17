@@ -24,6 +24,7 @@ class AnnealingStrategyGlobal():
         self.epochs_number = []
         self.csv_output = csv_output
         self.result_output = result_output
+        self.global_best_solution = None
 
         self.general_params = t.ParameterProvider(configFile)
 
@@ -91,6 +92,7 @@ class AnnealingStrategyGlobal():
 
         global_best_index = max(range(len(solutions_list)), key=lambda i: solutions_list[i].result)
         global_best_solution = solutions_list[global_best_index]
+        self.global_best_solution = global_best_solution
 
         for i in range(0,self.max_iters):
             print("annealing epoch: ",i, " temperature: ", temperature)

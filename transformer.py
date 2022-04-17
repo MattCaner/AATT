@@ -86,7 +86,7 @@ class ParameterProvider():
             "n_encoders": arr[4],
             "n_decoders": arr[5],
             "n_heads": arr[6],
-            #"n_epochs": arr[7],
+            "epochs": self.dictionary["epochs"],
             "learning_rate": self.dictionary["learning_rate"],
             "language_in_file": self.dictionary["language_in_file"],
             "language_out_file": self.dictionary["language_out_file"],
