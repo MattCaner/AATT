@@ -11,8 +11,11 @@ train_dataset, test_dataset = cd.getSets()
 
 transformer = t.Transformer(general_params,v_in,v_out)
 
+lr = 1
+
 for i in range(0,50):
-    t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = 1, epochs = 10)
+    print("lr: "+str(lr))
+    _, lr = t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = lr, epochs = 10)
     print("Evaluation: ")
     quality = t.evaluate(transformer,test_dataset,use_cuda = True, device = torch.cuda.current_device(),batch_size=32)
     print(quality)
