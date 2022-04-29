@@ -58,7 +58,8 @@ class ParameterProvider():
                 "vocab_in_size": 0,
                 "vocab_out_size": 0,
                 "learning_rate": float(self.config['TRAINING PARAMETERS']['learning_rate']),
-                "epochs": int(self.config['TRAINING PARAMETERS']['epochs'])
+                "epochs": int(self.config['TRAINING PARAMETERS']['epochs']),
+                "dropout": float(self.config['TRAINING PARAMETERS']['dropout'])
             }
         else:
             self.dictionary = {
@@ -92,6 +93,7 @@ class ParameterProvider():
             "language_out_file": self.dictionary["language_out_file"],
             "vocab_in_size": self.dictionary["vocab_in_size"],
             "vocab_out_size": self.dictionary["vocab_out_size"],
+            "dropout": self.dictionary["dropout"]
         }
 
     def getArray(self) -> List:
@@ -154,6 +156,7 @@ class PositionalEncoding(nn.Module):
         super().__init__()
         self.d_model = config.provide('d_model')
         self.n = 10000
+        self.dropout = nn.Dropout(p=config.provide('dropout'))
     
 
     def forward(self, input_x: Tensor) -> Tensor:
@@ -167,7 +170,7 @@ class PositionalEncoding(nn.Module):
                 pe[k, 2*i+1] = math.cos(k/denominator)
         pe = torch.stack([pe for _ in range(input_x.size(0))])
         pe = pe.to(device=input_x.device)
-        return input_x + pe
+        return self.dropout(input_x + pe)
 
 class AttentionHead(nn.Module):
     def __init__(self, config: ParameterProvider, masked: bool = False, d_v_override: int = None, d_qk_override: int = None):
