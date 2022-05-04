@@ -74,7 +74,7 @@ class ParameterProvider():
                 "language_out_file": "",
                 "vocab_in_size": 0,
                 "vocab_out_size": 0,
-                "learning_rate": 0.0,
+                "learning_rate": 1.0,
                 "epochs": 0
             }
     
@@ -383,8 +383,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
     criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
 
     model.train()
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr,)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.90)
+    optimizer = torch.optim.Adam(model.parameters(),lr=lr)
     data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     
     ntokens = model.vocab_out.getVocabLength()
@@ -404,10 +403,9 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             optimizer.step()
 
             last_loss = loss.item() / sum(len_out)
-        scheduler.step()
 
 
-    return last_loss, scheduler.get_last_lr()[0]
+    return last_loss
 
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
@@ -442,12 +440,12 @@ def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, 
     for i in range(0,max_epochs):
         result_epochs += 1
         old_result = new_result
-        new_result, lr = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)
+        new_result = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)
         difference = (old_result - new_result) / old_result
         if abs(difference) < min_difference:
-            return new_result, result_epochs, lr
+            return new_result, result_epochs
 
-    return new_result, result_epochs, lr
+    return new_result, result_epochs
 
 def train(model: nn.Module, train_dataset: CustomDataSet, lr: float = 0.1, epochs: int = 1) -> None:
     optimizer = torch.optim.SGD(model.parameters(),lr=lr)

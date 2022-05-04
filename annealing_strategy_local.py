@@ -218,8 +218,8 @@ class AnnealingStrategyLocal():
     def performAnnealing(self, thread_number: int, solutions: List[Solution], epochs_number: List[int], T: float, operationsMemory: List) -> None:
         old_fitness = solutions[thread_number].result
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
-        res, epochs, lr = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=min(new_transformer.config.provide("learning_rate")+1.,2.),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
-        new_transformer.config.change('learning_rate',lr)
+        res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=min(new_transformer.config.provide("learning_rate")+1.,2.),max_epochs=new_transformer.config.provide("epochs"),device=cuda.current_device())
+        #new_transformer.config.change('learning_rate',lr)
         new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         epochs_number[thread_number] = epochs
         if new_fitness < old_fitness:
