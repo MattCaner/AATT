@@ -380,7 +380,9 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
     
 
     model.cuda(device=device)
-    criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
+    #criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
+    criterion = nn.CrossEntropyLoss(reduction="mean").cuda(device)
+
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters(),lr=lr)
@@ -392,12 +394,28 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
     for epoch in range(epochs):
 
         for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
+            #print(str(i) + " of " + str(len(data_loader)))
             data_in = data_in.cuda(device)
             data_out = data_out.cuda(device)
             data_out_numeric = data_out_numeric.cuda(device)
             optimizer.zero_grad()
             output = model(data_in, data_out)
-            loss = criterion(output.view(-1, ntokens),data_out.view(-1))
+
+            data_out_numeric = torch.zeros(output.size())
+
+            for s, sentence in enumerate(data_out):
+                for w, word in enumerate(sentence):
+                    data_out_numeric[s][w][word] = 1.0
+
+            data_out_numeric = data_out_numeric.cuda(device)
+
+            #for s, sentence in enumerate(data_out):
+            #    for w, word in enumerate(sentence):
+            #        data_out_numeric[s][w][word] = 1.0
+
+
+            #loss = criterion(output.view(-1, ntokens),data_out.view(-1))
+            loss = criterion(output,data_out_numeric)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
@@ -405,7 +423,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             last_loss = loss.item() / sum(len_out)
 
 
-    return last_loss
+    return last_loss, lr
 
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
