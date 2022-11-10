@@ -1,6 +1,2 @@
 # AATT
-AATT (Advanced Adaptive Transformer Topologies) is an experimental implementation of transformer network topologies optimization methods, including the use of the surrogate optimization and simulated annealing
-
-This is my master thesis code.
-
-My master thesis is written at the Faculty of Physics and  Applied Computer Science, AGH University of Technology in Kraków, supervised by Professor Szymon Łukasik.
+AATT (Advanced Adaptive Transformer Topologies) is an experimental implementation of transformer network topologies optimization methods. It was used as my master thesis code, but the development hasn't ended there and is still in progress.
