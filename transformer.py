@@ -20,6 +20,7 @@ class Utils():
     def tokenize(text: str) -> List[str]:
         tokenizer = get_tokenizer("moses")
         result = tokenizer(text)
+        result.insert(0,"<sos>")
         result.append("<eos>")
         return result
 
@@ -59,7 +60,8 @@ class ParameterProvider():
                 "vocab_out_size": 0,
                 "learning_rate": float(self.config['TRAINING PARAMETERS']['learning_rate']),
                 "epochs": int(self.config['TRAINING PARAMETERS']['epochs']),
-                "dropout": float(self.config['TRAINING PARAMETERS']['dropout'])
+                "dropout": float(self.config['TRAINING PARAMETERS']['dropout']),
+                "masked_attention_matrix": bool(self.config['MODE']['masked_attention_matrix'])
             }
         else:
             self.dictionary = {
@@ -123,7 +125,8 @@ class ParameterProvider():
 class VocabProvider():
     def __init__(self, config: ParameterProvider, vocabSourceFile: str):
         self.vocab = build_vocab_from_iterator(Utils.yield_tokens(vocabSourceFile), specials=["<unk>"])
-        self.vocab.append_token("<eos>")
+        self.vocab.append_token("<eos>")    #end of sentence
+        self.vocab.append_token("<sos>")    #start of sentence
         self.vocab.set_default_index(0)
     
     def getVocabLength(self) -> int:
@@ -290,9 +293,10 @@ class DecoderStack(nn.Module):
         return input_data
 
 class Transformer(nn.Module):
-    def __init__(self, config: ParameterProvider, vocab_in: VocabProvider, vocab_out: VocabProvider, use_string_input = False):
+    def __init__(self, config: ParameterProvider, vocab_in: VocabProvider, vocab_out: VocabProvider, use_string_input = False, mask = True):
         super().__init__()
         self.config = config
+        
         self.d_model = config.provide("d_model")
         self.vocab_in = vocab_in
         config.change("vocab_in_size",self.vocab_in.getVocabLength())        
@@ -311,6 +315,9 @@ class Transformer(nn.Module):
         self.numerical_out = NumericalOut(config)
         self.lexical_out = LexicalOut(config, self.vocab_out)
 
+    def setMasking(self, mask: Boolean):
+        self.mask = mask
+
 
     def forward(self, encoder_input: str, decoder_input: str):
         in_embedded = self.embedding_in(encoder_input)
@@ -323,6 +330,18 @@ class Transformer(nn.Module):
         numerical = self.numerical_out(decoder_out)
         return numerical
         #return self.lexical_out(numerical)
+
+    def processSentence(self, sentence: str, maxwords: number = 32):
+        output = ["<sos>"]
+        input = Utils.tokenize(sentence)
+        wordcount = 0
+        while wordcount < maxwords or output[-1] != "<eos>":
+            output = self.forward(input,output)
+        
+
+
+
+
 
 class CustomDataSet(Dataset):
     def __init__(self, infile: str, outfile: str, vocab_in: VocabProvider, vocab_out: VocabProvider):
@@ -403,19 +422,19 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
             data_out_numeric = torch.zeros(output.size())
 
-            for s, sentence in enumerate(data_out):
-                for w, word in enumerate(sentence):
-                    data_out_numeric[s][w][word] = 1.0
+            #for s, sentence in enumerate(data_out):
+            #    for w, word in enumerate(sentence):
+            #        data_out_numeric[s][w][word] = 1.0
 
-            data_out_numeric = data_out_numeric.cuda(device)
+            #data_out_numeric = data_out_numeric.cuda(device)
 
             #for s, sentence in enumerate(data_out):
             #    for w, word in enumerate(sentence):
             #        data_out_numeric[s][w][word] = 1.0
 
 
-            #loss = criterion(output.view(-1, ntokens),data_out.view(-1))
-            loss = criterion(output,data_out_numeric)
+            loss = criterion(output.view(-1, ntokens),data_out.view(-1))
+            #loss = criterion(output,data_out_numeric)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
