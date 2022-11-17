@@ -316,7 +316,9 @@ class Transformer(nn.Module):
         self.lexical_out = LexicalOut(config, self.vocab_out)
 
     def setMasking(self, mask: Boolean):
-        self.mask = mask
+        for d in self.decoder_stack.decoders:
+            for a in d.ed_mha.heads:
+                a.masked = mask
 
 
     def forward(self, encoder_input: str, decoder_input: str):
@@ -332,14 +334,25 @@ class Transformer(nn.Module):
         #return self.lexical_out(numerical)
 
     def processSentence(self, sentence: str, maxwords: number = 32):
+        self.setMasking(False)
         output = ["<sos>"]
+
+        output = self.vocab_out.getValues(output)
+        output = output.cuda(torch.cuda.current_device())
+
         input = Utils.tokenize(sentence)
+        input = torch.unsqueeze(self.vocab_in.getValues(input),0)
+        input = input.cuda(torch.cuda.current_device())
+
         wordcount = 0
         while wordcount < maxwords or output[-1] != "<eos>":
-            output = self.forward(input,output)
+            newoutput = self.forward(input,output)
+            output = [output, torch.argmax(i) for i in newoutput]
+            output = torch.unsqueeze(torch.Tensor(output).int(),0)
+            output = output.cuda(torch.cuda.current_device())
+            wordcount += 1
         
-
-
+        return output
 
 
 
