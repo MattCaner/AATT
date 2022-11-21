@@ -172,8 +172,8 @@ class PositionalEncoding(nn.Module):
                 pe[k, 2*i] = math.sin(k/denominator)
                 pe[k, 2*i+1] = math.cos(k/denominator)
         pe = torch.stack([pe for _ in range(input_x.size(0))])
-        pe = pe.to(device=input_x.device)
-        return self.dropout(input_x + pe)
+        pe = pe.cuda(device=input_x.device)
+        return self.dropout(torch.add(input_x,pe))
 
 class AttentionHead(nn.Module):
     def __init__(self, config: ParameterProvider, masked: bool = False, d_v_override: int = None, d_qk_override: int = None):
@@ -339,20 +339,29 @@ class Transformer(nn.Module):
 
         output = self.vocab_out.getValues(output)
         output = output.cuda(torch.cuda.current_device())
+        output = output.unsqueeze(0)
 
         input = Utils.tokenize(sentence)
         input = torch.unsqueeze(self.vocab_in.getValues(input),0)
         input = input.cuda(torch.cuda.current_device())
 
         wordcount = 0
-        while wordcount < maxwords or output[-1] != "<eos>":
+        sentence_end = self.vocab_out.vocab['<eos>']
+        while wordcount < maxwords and output[0][-1] != sentence_end:
+            #print(output)
             newoutput = self.forward(input,output)
-            output = [output, torch.argmax(i) for i in newoutput]
-            output = torch.unsqueeze(torch.Tensor(output).int(),0)
-            output = output.cuda(torch.cuda.current_device())
+            maxvals = [torch.argmax(i) for i in newoutput[0]]
+            last_max_val = maxvals[-1]
+            output = torch.cat((output[0],last_max_val.unsqueeze(0)))
+            output = torch.unsqueeze(output,0)
+            #output = output.cuda(torch.cuda.current_device())
             wordcount += 1
+
+        print(output)
         
-        return output
+        output_lexical = self.vocab_out.vocab.lookup_tokens(output[0].tolist())
+
+        return output_lexical
 
 
 
@@ -413,7 +422,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
     model.cuda(device=device)
     #criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
-    criterion = nn.CrossEntropyLoss(reduction="mean").cuda(device)
+    criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0,size_average=True).cuda(device)
 
 
     model.train()
@@ -424,16 +433,17 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
     last_loss = 0.
     for epoch in range(epochs):
-
+        print('Epoch ' + str(epoch)+' of '+str(epochs))
+        epoch_loss = 0.
         for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
-            #print(str(i) + " of " + str(len(data_loader)))
+            if i%100 == 0:
+                print(str(i) + " of " + str(len(data_loader)))
             data_in = data_in.cuda(device)
             data_out = data_out.cuda(device)
-            data_out_numeric = data_out_numeric.cuda(device)
-            optimizer.zero_grad()
-            output = model(data_in, data_out)
+            #data_out_numeric = data_out_numeric.cuda(device)
 
-            data_out_numeric = torch.zeros(output.size())
+
+            #data_out_numeric = torch.zeros(output.size())
 
             #for s, sentence in enumerate(data_out):
             #    for w, word in enumerate(sentence):
@@ -444,15 +454,30 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             #for s, sentence in enumerate(data_out):
             #    for w, word in enumerate(sentence):
             #        data_out_numeric[s][w][word] = 1.0
+            
+            data_out_shifted = torch.roll(data_out,-1)
+            for d in data_out_shifted:
+                d[-1] = 0
 
+            
 
-            loss = criterion(output.view(-1, ntokens),data_out.view(-1))
+            data_out_shifted = data_out_shifted.cuda(device)
+            optimizer.zero_grad()
+            output = model(data_in, data_out)
+
+            loss = criterion(output.view(-1, ntokens),data_out_shifted.view(-1))
             #loss = criterion(output,data_out_numeric)
+
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
             last_loss = loss.item() / sum(len_out)
+            epoch_loss += last_loss
+        epoch_loss /= len(data_loader)
+
+        print("Epoch loss: "+str(epoch_loss))
+        
 
 
     return last_loss, lr
@@ -460,9 +485,9 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
 
-    criterion = nn.CrossEntropyLoss(reduction='mean',ignore_index=0)
+    criterion = nn.CrossEntropyLoss(reduction='mean',ignore_index=0,size_average=True)
     if use_cuda:
-        criterion = nn.CrossEntropyLoss(reduction='mean',ignore_index=0).cuda(device)
+        criterion = nn.CrossEntropyLoss(reduction='mean',ignore_index=0,size_average=True).cuda(device)
         model.cuda(device)    
     
     model.eval()
@@ -479,7 +504,13 @@ def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = 
                 data_out = data_out.cuda(device)
                 data_out_numeric = data_out_numeric.cuda(device)
             output = model(data_in, data_out)
-            total_loss += criterion(output.view(-1, ntokens), data_out.view(-1))
+
+            data_out_shifted = torch.roll(data_out,-1)
+            for d in data_out_shifted:
+                d[-1] = 0
+            data_out_shifted = data_out_shifted.cuda(device)
+
+            total_loss += criterion(output.view(-1, ntokens), data_out_shifted.view(-1))
     return total_loss.item() / len(test_dataset)
 
 

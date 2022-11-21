@@ -11,15 +11,26 @@ train_dataset, test_dataset = cd.getSets()
 
 transformer = t.Transformer(general_params,v_in,v_out)
 
-lr = 0.001
+lr = 0.003
 
 for i in range(0,1):
     print("iteration: "+str(i)+"lr: "+str(lr))
-    t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = lr, epochs = 1)
+    t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = lr, epochs = 20)
     print("Evaluation: ")
     quality = t.evaluate(transformer,test_dataset,use_cuda = True, device = torch.cuda.current_device(),batch_size=32)
     print(quality)
 
 q = t.evaluate(transformer,test_dataset,use_cuda = True, device = torch.cuda.current_device(),batch_size=32)
 
-print(transformer.processSentence('Uciekaj!'))
+f = open('simplepl.txt','r',encoding = 'utf-8')
+f2 = open('simpleen.txt','r',encoding = 'utf-8')
+
+
+lines = f.readlines()
+
+f.close()
+
+for line in lines:
+    print(transformer.processSentence(line))
+    print(line)
+    print("-----------------------")
