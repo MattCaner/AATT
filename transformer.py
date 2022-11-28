@@ -335,7 +335,7 @@ class Transformer(nn.Module):
         return numerical
         #return self.lexical_out(numerical)
 
-    def processSentence(self, sentence: str, maxwords: int = 32):
+    def processSentence(self, sentence: str, maxwords: number = 32):
         self.setMasking(False)
         output = ["<sos>"]
 
@@ -363,40 +363,7 @@ class Transformer(nn.Module):
         
         output_lexical = self.vocab_out.vocab.lookup_tokens(output[0].tolist())
 
-        return output_lexical[1:-1]
-
-    def processTokensToSentence(self, sentence: list, maxwords: int = 32):
-        self.setMasking(False)
-        output = ["<sos>"]
-
-        output = self.vocab_out.getValues(output)
-        output = output.cuda(torch.cuda.current_device())
-        output = output.unsqueeze(0)
-
-        input = Utils.tokenize(sentence)
-        input = torch.unsqueeze(self.vocab_in.getValues(input),0)
-        input = input.cuda(torch.cuda.current_device())
-
-        wordcount = 0
-        sentence_end = self.vocab_out.vocab['<eos>']
-        while wordcount < maxwords and output[0][-1] != sentence_end:
-            #print(output)
-            newoutput = self.forward(input,output)
-            maxvals = [torch.argmax(i) for i in newoutput[0]]
-            last_max_val = maxvals[-1]
-            output = torch.cat((output[0],last_max_val.unsqueeze(0)))
-            output = torch.unsqueeze(output,0)
-            #output = output.cuda(torch.cuda.current_device())
-            wordcount += 1
-
-        print(output)
-        
-        output_lexical = self.vocab_out.vocab.lookup_tokens(output[0].tolist())
-
-        return output_lexical[1:-1]
-
-    def tokensOutToSentence(self, tokens: list):
-        return self.vocab_out.vocab.lookup_tokens(tokens)
+        return output_lexical
 
 
 
@@ -620,9 +587,27 @@ def calculate_bleu(model: nn.Module, dataset: CustomDataSet, singleTranslation =
                 d[-1] = 0
             data_out_shifted = data_out_shifted.cuda(device)
 
-            candidates = 
+            output = model(data_in,data_out_shifted)
 
-            bleu_cumulative += bleu_score(candidates,references)
+            candidates_fused = []
+            references_fused = []
+
+            for sentence in output:
+                stringized_sentence = model.vocab_out.vocab.lookup_tokens([int(torch.argmax(i)) for i in sentence])
+                eos_token = '<eos>'
+                if eos_token in stringized_sentence:
+                    stringized_sentence = stringized_sentence[:stringized_sentence.index(eos_token)]
+                candidates_fused.append(stringized_sentence)
+
+            for sentence in data_out_shifted:
+                stringized_sentence = model.vocab_out.vocab.lookup_tokens([int(i) for i in sentence])
+                eos_token = '<eos>'
+                if eos_token in stringized_sentence:
+                    stringized_sentence = stringized_sentence[:stringized_sentence.index(eos_token)]
+                references_fused.append([stringized_sentence])
+
+
+            bleu_cumulative += bleu_score(candidates_fused,references_fused)
     return bleu_cumulative / epochs
 
 
@@ -650,8 +635,23 @@ def calculate_rogue(model: nn.Module, dataset: CustomDataSet, singleTranslation 
 
             output = model(data_in,data_out_shifted)
 
-            candidates_fused = [' '.join([str(int(torch.argmax(i))) for i in sentence]) for sentence in output]
-            references_fused = [' '.join([str(int(i)) for i in sentence]) for sentence in data_out_shifted]
+            candidates_fused = []
+            references_fused = []
+
+            for sentence in output:
+                stringized_sentence = model.vocab_out.vocab.lookup_tokens([int(torch.argmax(i)) for i in sentence])
+                eos_token = '<eos>'
+                if eos_token in stringized_sentence:
+                    stringized_sentence = stringized_sentence[:stringized_sentence.index(eos_token)]
+                candidates_fused.append(' '.join(stringized_sentence))
+
+            for sentence in data_out_shifted:
+                stringized_sentence = model.vocab_out.vocab.lookup_tokens([int(i) for i in sentence])
+                eos_token = '<eos>'
+                if eos_token in stringized_sentence:
+                    stringized_sentence = stringized_sentence[:stringized_sentence.index(eos_token)]
+                references_fused.append(' '.join(stringized_sentence))
+
 
             rogue_cumulative.update(candidates_fused,references_fused)
-    return rogue_cumulative
+        return rogue_cumulative.compute()

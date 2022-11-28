@@ -16,15 +16,19 @@ lr = 0.003
 
 for i in range(0,1):
     print("iteration: "+str(i)+"lr: "+str(lr))
-    t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = lr, epochs = 1)
+    t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = lr, epochs = 100)
     print("Evaluation: ")
     quality = t.evaluate(transformer,test_dataset,use_cuda = True, device = torch.cuda.current_device(),batch_size=32)
     print(quality)
 
 q = t.evaluate(transformer,test_dataset,use_cuda = True, device = torch.cuda.current_device(),batch_size=32)
 
-print(t.calculate_bleu(transformer,test_dataset))
-pprint(t.calculate_rogue(transformer,train_dataset))
+bleu = t.calculate_bleu(transformer,train_dataset)
+rogue = t.calculate_rogue(transformer,train_dataset)
+
+
+print(bleu)
+pprint(rogue)
 
 f = open('simplepl.txt','r',encoding = 'utf-8')
 f2 = open('simpleen.txt','r',encoding = 'utf-8')
