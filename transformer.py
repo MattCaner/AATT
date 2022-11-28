@@ -11,6 +11,9 @@ import math
 import configparser
 from torch.utils.data import Dataset, DataLoader
 import copy
+from torchtext.data.metrics import bleu_score
+from torchmetrics.text.rouge import ROUGEScore
+
 
 # custom util transformer entity
 # CUTE
@@ -60,8 +63,7 @@ class ParameterProvider():
                 "vocab_out_size": 0,
                 "learning_rate": float(self.config['TRAINING PARAMETERS']['learning_rate']),
                 "epochs": int(self.config['TRAINING PARAMETERS']['epochs']),
-                "dropout": float(self.config['TRAINING PARAMETERS']['dropout']),
-                "masked_attention_matrix": bool(self.config['MODE']['masked_attention_matrix'])
+                "dropout": float(self.config['TRAINING PARAMETERS']['dropout'])
             }
         else:
             self.dictionary = {
@@ -333,7 +335,7 @@ class Transformer(nn.Module):
         return numerical
         #return self.lexical_out(numerical)
 
-    def processSentence(self, sentence: str, maxwords: number = 32):
+    def processSentence(self, sentence: str, maxwords: int = 32):
         self.setMasking(False)
         output = ["<sos>"]
 
@@ -361,7 +363,40 @@ class Transformer(nn.Module):
         
         output_lexical = self.vocab_out.vocab.lookup_tokens(output[0].tolist())
 
-        return output_lexical
+        return output_lexical[1:-1]
+
+    def processTokensToSentence(self, sentence: list, maxwords: int = 32):
+        self.setMasking(False)
+        output = ["<sos>"]
+
+        output = self.vocab_out.getValues(output)
+        output = output.cuda(torch.cuda.current_device())
+        output = output.unsqueeze(0)
+
+        input = Utils.tokenize(sentence)
+        input = torch.unsqueeze(self.vocab_in.getValues(input),0)
+        input = input.cuda(torch.cuda.current_device())
+
+        wordcount = 0
+        sentence_end = self.vocab_out.vocab['<eos>']
+        while wordcount < maxwords and output[0][-1] != sentence_end:
+            #print(output)
+            newoutput = self.forward(input,output)
+            maxvals = [torch.argmax(i) for i in newoutput[0]]
+            last_max_val = maxvals[-1]
+            output = torch.cat((output[0],last_max_val.unsqueeze(0)))
+            output = torch.unsqueeze(output,0)
+            #output = output.cuda(torch.cuda.current_device())
+            wordcount += 1
+
+        print(output)
+        
+        output_lexical = self.vocab_out.vocab.lookup_tokens(output[0].tolist())
+
+        return output_lexical[1:-1]
+
+    def tokensOutToSentence(self, tokens: list):
+        return self.vocab_out.vocab.lookup_tokens(tokens)
 
 
 
@@ -432,6 +467,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
     ntokens = model.vocab_out.getVocabLength()
 
     last_loss = 0.
+    epoch_loss = 0.
     for epoch in range(epochs):
         print('Epoch ' + str(epoch)+' of '+str(epochs))
         epoch_loss = 0.
@@ -480,7 +516,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
         
 
 
-    return last_loss, lr
+    return epoch_loss, lr
 
 
 def evaluate(model: nn.Module, test_dataset: CustomDataSet, use_cuda: Boolean = False, device: int = 0, batch_size = 32) -> float:
@@ -521,7 +557,7 @@ def train_until_difference_cuda(model: nn.Module, train_dataset: CustomDataSet, 
     for i in range(0,max_epochs):
         result_epochs += 1
         old_result = new_result
-        new_result = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)
+        new_result, _ = train_cuda(model,train_dataset,lr=lr,epochs=1,batch_size=batch_size,device=device)
         difference = (old_result - new_result) / old_result
         if abs(difference) < min_difference:
             return new_result, result_epochs
@@ -561,3 +597,61 @@ def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_d
         if abs(difference) < min_difference:
             return new_result
     return new_result
+
+def calculate_bleu(model: nn.Module, dataset: CustomDataSet, singleTranslation = True, batch_size: int = 32,use_cuda: bool = True, device: int = 0):
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    
+    ntokens = model.vocab_out.getVocabLength()
+
+    epochs = 0
+    bleu_cumulative = 0.
+
+    with torch.no_grad():
+        for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
+            epochs += 1
+            if use_cuda:
+                data_in = data_in.cuda(device)
+                data_out = data_out.cuda(device)
+                data_out_numeric = data_out_numeric.cuda(device)
+            output = model(data_in, data_out)
+
+            data_out_shifted = torch.roll(data_out,-1)
+            for d in data_out_shifted:
+                d[-1] = 0
+            data_out_shifted = data_out_shifted.cuda(device)
+
+            candidates = 
+
+            bleu_cumulative += bleu_score(candidates,references)
+    return bleu_cumulative / epochs
+
+
+def calculate_rogue(model: nn.Module, dataset: CustomDataSet, singleTranslation = True, batch_size: int = 32,use_cuda: bool = True, device: int = 0):
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    
+    ntokens = model.vocab_out.getVocabLength()
+
+    epochs = 0
+    rogue_cumulative = ROUGEScore(accumulate='avg')
+
+    with torch.no_grad():
+        for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
+            epochs += 1
+            if use_cuda:
+                data_in = data_in.cuda(device)
+                data_out = data_out.cuda(device)
+                data_out_numeric = data_out_numeric.cuda(device)
+            output = model(data_in, data_out)
+
+            data_out_shifted = torch.roll(data_out,-1)
+            for d in data_out_shifted:
+                d[-1] = 0
+            data_out_shifted = data_out_shifted.cuda(device)
+
+            output = model(data_in,data_out_shifted)
+
+            candidates_fused = [' '.join([str(int(torch.argmax(i))) for i in sentence]) for sentence in output]
+            references_fused = [' '.join([str(int(i)) for i in sentence]) for sentence in data_out_shifted]
+
+            rogue_cumulative.update(candidates_fused,references_fused)
+    return rogue_cumulative
