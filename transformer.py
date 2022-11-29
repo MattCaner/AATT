@@ -565,6 +565,27 @@ def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_d
             return new_result
     return new_result
 
+
+def raw_data_bleu(model: Transformer, sentencesFrom: list, sentencesTo: list):
+    translated_list = []
+    correct_translated = []
+    for i, sentence in enumerate(sentencesFrom):
+        translated_list.append(model.processSentence(sentence)[1:])    #without "<sos>"
+        correct_translated.append([Utils.tokenize(sentencesTo[i])])
+    
+    return bleu_score(translated_list,correct_translated)
+        
+
+def raw_data_rogue(model: nn.Module, sentencesFrom: list, sentencesTo: list):
+    translated_list = []
+    correct_translated = []
+    rogue = ROUGEScore()
+    for i, sentence in enumerate(sentencesFrom):
+        translated_list.append(model.processSentence(sentence)[1:])    #without "<sos>"
+        correct_translated.append(' '.join(Utils.tokenize(sentencesTo[i])))
+    
+    return rogue(translated_list,correct_translated)
+
 def calculate_bleu(model: nn.Module, dataset: CustomDataSet, singleTranslation = True, batch_size: int = 32,use_cuda: bool = True, device: int = 0):
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
