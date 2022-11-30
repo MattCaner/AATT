@@ -335,7 +335,7 @@ class Transformer(nn.Module):
         return numerical
         #return self.lexical_out(numerical)
 
-    def processSentence(self, sentence: str, maxwords: number = 32):
+    def processSentence(self, sentence: str, maxwords: number = 32, autoprint = False):
         self.setMasking(False)
         output = ["<sos>"]
 
@@ -358,9 +358,10 @@ class Transformer(nn.Module):
             output = torch.unsqueeze(output,0)
             #output = output.cuda(torch.cuda.current_device())
             wordcount += 1
-
-        print(output)
         
+        if autoprint:
+            print(output)
+
         output_lexical = self.vocab_out.vocab.lookup_tokens(output[0].tolist())
 
         return output_lexical
@@ -577,14 +578,13 @@ def raw_data_bleu(model: Transformer, sentencesFrom: list, sentencesTo: list):
         
 
 def raw_data_rogue(model: nn.Module, sentencesFrom: list, sentencesTo: list):
-    translated_list = []
-    correct_translated = []
     rogue = ROUGEScore()
     for i, sentence in enumerate(sentencesFrom):
-        translated_list.append(model.processSentence(sentence)[1:])    #without "<sos>"
-        correct_translated.append(' '.join(Utils.tokenize(sentencesTo[i])))
+        translated = model.processSentence(sentence)[1:]    #without "<sos>"
+        correct_translated = ' '.join(Utils.tokenize(sentencesTo[i]))
+        rogue.update(translated,correct_translated)
     
-    return rogue(translated_list,correct_translated)
+    return rogue.compute()
 
 def calculate_bleu(model: nn.Module, dataset: CustomDataSet, singleTranslation = True, batch_size: int = 32,use_cuda: bool = True, device: int = 0):
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)

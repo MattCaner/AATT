@@ -229,7 +229,7 @@ class AnnealingStrategyLocal():
                 solutions[thread_number] = Solution(new_transformer,new_fitness)
 
     def generateTemperature(self,initial_solutions: List) -> float:
-        return mean(i.result for i in initial_solutions)
+        return max(i.result for i in initial_solutions) - min(i.result for i in initial_solutions)
 
     def generateInitialSolutions(self) -> List[Solution]:
         s = []

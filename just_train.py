@@ -33,12 +33,22 @@ pprint(rogue)
 f = open('simplepl.txt','r',encoding = 'utf-8')
 f2 = open('simpleen.txt','r',encoding = 'utf-8')
 
-
+lines_compare = list(map(str.lower,f2.readlines()))
 lines = list(map(str.lower,f.readlines()))
 
 f.close()
+f2.close()
 
-for line in lines:
-    print(transformer.processSentence(line))
+
+
+for i, line in enumerate(lines):
+    print(transformer.processSentence(line,autoprint=True))
     print(line)
+    print(lines_compare[i])
     print("-----------------------")
+
+bleu = t.raw_data_bleu(transformer,lines,lines_compare)
+rogue = t.raw_data_rogue(transformer,lines,lines_compare)
+
+print(bleu)
+pprint(rogue)
