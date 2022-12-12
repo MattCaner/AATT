@@ -567,21 +567,30 @@ def train_until_difference(model: nn.Module, train_dataset: CustomDataSet, min_d
     return new_result
 
 
-def raw_data_bleu(model: Transformer, sentencesFrom: list, sentencesTo: list):
+def raw_data_bleu(model: Transformer, sentencesFrom: io.TextIOWrapper, sentencesTo: io.TextIOWrapper):
+
+    lines_compare = list(map(str.lower,sentencesTo.readlines()))
+    lines = list(map(str.lower,sentencesFrom.readlines()))
+
     translated_list = []
     correct_translated = []
-    for i, sentence in enumerate(sentencesFrom):
+    for i, sentence in enumerate(lines):
         translated_list.append(model.processSentence(sentence)[1:])    #without "<sos>"
-        correct_translated.append([Utils.tokenize(sentencesTo[i])])
+        correct_translated.append([Utils.tokenize(lines_compare[i])])
     
     return bleu_score(translated_list,correct_translated)
         
 
-def raw_data_rogue(model: nn.Module, sentencesFrom: list, sentencesTo: list):
+def raw_data_rogue(model: nn.Module, sentencesFrom: io.TextIOWrapper, sentencesTo: io.TextIOWrapper):
+
+
+    lines_compare = list(map(str.lower,sentencesTo.readlines()))
+    lines = list(map(str.lower,sentencesFrom.readlines()))
+
     rogue = ROUGEScore()
-    for i, sentence in enumerate(sentencesFrom):
+    for i, sentence in enumerate(lines):
         translated = model.processSentence(sentence)[1:]    #without "<sos>"
-        correct_translated = ' '.join(Utils.tokenize(sentencesTo[i]))
+        correct_translated = ' '.join(Utils.tokenize(lines_compare[i]))
         rogue.update(translated,correct_translated)
     
     return rogue.compute()

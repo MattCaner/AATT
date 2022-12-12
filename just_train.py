@@ -12,7 +12,7 @@ train_dataset, test_dataset = cd.getSets()
 
 transformer = t.Transformer(general_params,v_in,v_out)
 
-lr = 0.003
+lr = 0.001
 
 for i in range(0,1):
     print("iteration: "+str(i)+"lr: "+str(lr))
@@ -36,10 +36,6 @@ f2 = open('simpleen.txt','r',encoding = 'utf-8')
 lines_compare = list(map(str.lower,f2.readlines()))
 lines = list(map(str.lower,f.readlines()))
 
-f.close()
-f2.close()
-
-
 
 for i, line in enumerate(lines):
     print(transformer.processSentence(line,autoprint=True))
@@ -47,8 +43,19 @@ for i, line in enumerate(lines):
     print(lines_compare[i])
     print("-----------------------")
 
-bleu = t.raw_data_bleu(transformer,lines,lines_compare)
-rogue = t.raw_data_rogue(transformer,lines,lines_compare)
+f.seek(0)
+f2.seek(0)
+
+bleu = t.raw_data_bleu(transformer,f,f2)
+
+
+f.seek(0)
+f2.seek(0)
+
+rogue = t.raw_data_rogue(transformer,f,f2)
+
 
 print(bleu)
 pprint(rogue)
+
+

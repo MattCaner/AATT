@@ -6,7 +6,7 @@ import os
 configpath = os.environ["SCRATCH"] + "/params.config"
 outpath = os.environ["SCRATCH"]
 '''
-configpath = "benchmark.config"
+configpath = "params_local.config"
 outpath = ""
 
 
