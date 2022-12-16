@@ -70,8 +70,8 @@ def changeFFDimensions(transformer: t.Transformer) -> t.Transformer:
     if location < len(transformer.encoder_stack.encoders):
         old_dim = transformer.encoder_stack.encoders[location].d_ff
         dim_model = transformer.d_model
-        ubound = 1
-        lbound = -1
+        ubound = int(old_dim * 1.1)+1
+        lbound = int(old_dim*0.9)-1
         if old_dim < 2:
             lbound = 1
         change = random.randint(lbound,ubound)
@@ -81,8 +81,8 @@ def changeFFDimensions(transformer: t.Transformer) -> t.Transformer:
         location -= len(transformer.encoder_stack.encoders)
         old_dim = transformer.decoder_stack.decoders[location].d_ff
         dim_model = transformer.d_model
-        ubound = 1
-        lbound = -1
+        ubound = int(old_dim * 1.1)+1
+        lbound = int(old_dim*0.9)-1
         if old_dim < 2:
             lbound = 1
         change = random.randint(lbound,ubound)

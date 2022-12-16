@@ -1,4 +1,5 @@
 import io
+import random
 from typing import List
 from xmlrpc.client import Boolean
 from numpy import number
@@ -221,11 +222,20 @@ class MultiHeadedAttention(nn.Module):
 
 
 class EncoderLayer(nn.Module):
-    def __init__(self,config: ParameterProvider):
+    def __init__(self,config: ParameterProvider, randomize = False):
         super().__init__()
         self.d_model = config.provide("d_model")
         self.d_ff = config.provide("d_ff")
-        self.feed_forward = nn.Sequential(nn.Linear(self.d_model,self.d_ff),nn.ReLU(),nn.Linear(self.d_ff,self.d_model))
+        if randomize:
+            dff = self.d_ff
+            ubound = int(dff * 1.1)+1
+            lbound = int(dff*0.9)-1
+            if lbound < 2:
+                lbound = 1
+            dff = random.randint(lbound,ubound)
+            self.feed_forward = nn.Sequential(nn.Linear(self.d_model,dff),nn.ReLU(),nn.Linear(dff,self.d_model))
+        else:
+            self.feed_forward = nn.Sequential(nn.Linear(self.d_model,self.d_ff),nn.ReLU(),nn.Linear(self.d_ff,self.d_model))
         self.mha = MultiHeadedAttention(config)
         self.norm = nn.LayerNorm(self.d_model)
 
@@ -235,11 +245,20 @@ class EncoderLayer(nn.Module):
         return self.norm(torch.add(intermediate,self.feed_forward(intermediate)))
 
 class DecoderLayer(nn.Module):
-    def __init__(self, config: ParameterProvider):
+    def __init__(self, config: ParameterProvider, randomize = False):
         super().__init__()
         self.d_model = config.provide("d_model")
         self.d_ff = config.provide("d_ff")
-        self.feed_forward = nn.Sequential(nn.Linear(self.d_model,self.d_ff),nn.ReLU(),nn.Linear(self.d_ff,self.d_model))
+        if randomize:
+            dff = self.d_ff
+            ubound = int(dff * 1.1)+1
+            lbound = int(dff*0.9)-1
+            if lbound < 2:
+                lbound = 1
+            dff = random.randint(lbound,ubound)
+            self.feed_forward = nn.Sequential(nn.Linear(self.d_model,dff),nn.ReLU(),nn.Linear(dff,self.d_model))
+        else:
+            self.feed_forward = nn.Sequential(nn.Linear(self.d_model,self.d_ff),nn.ReLU(),nn.Linear(self.d_ff,self.d_model))
         self.self_mha = MultiHeadedAttention(config, masked = True)
         self.ed_mha = MultiHeadedAttention(config)
         self.norm = nn.LayerNorm(self.d_model)
@@ -575,8 +594,8 @@ def raw_data_bleu(model: Transformer, sentencesFrom: io.TextIOWrapper, sentences
     translated_list = []
     correct_translated = []
     for i, sentence in enumerate(lines):
-        translated_list.append(model.processSentence(sentence)[1:])    #without "<sos>"
-        correct_translated.append([Utils.tokenize(lines_compare[i])])
+        translated_list.append(model.processSentence(sentence)[1:-1])    #without "<sos>"
+        correct_translated.append([Utils.tokenize(lines_compare[i])[1:-1]])
     
     return bleu_score(translated_list,correct_translated)
         
@@ -589,8 +608,8 @@ def raw_data_rogue(model: nn.Module, sentencesFrom: io.TextIOWrapper, sentencesT
 
     rogue = ROUGEScore()
     for i, sentence in enumerate(lines):
-        translated = model.processSentence(sentence)[1:]    #without "<sos>"
-        correct_translated = ' '.join(Utils.tokenize(lines_compare[i]))
+        translated = model.processSentence(sentence)[1:-1]    #without "<sos>"
+        correct_translated = ' '.join(Utils.tokenize(lines_compare[i])[1:-1])
         rogue.update(translated,correct_translated)
     
     return rogue.compute()

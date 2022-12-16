@@ -10,7 +10,8 @@ modificationTable = [a.ModificationFunctions.addDecoderToEndOfStack,
                      a.ModificationFunctions.removeDecoderFromEndOfStack,
                      a.ModificationFunctions.removeEncoderFromEndOfStack,
                      a.ModificationFunctions.addRandomHead,
-                     a.ModificationFunctions.removeRandomHead
+                     a.ModificationFunctions.removeRandomHead,
+                     a.ModificationFunctions.changeFFDimensions
                     ]
 
 modificationChances = [0.2,
@@ -18,10 +19,11 @@ modificationChances = [0.2,
                        0.2,
                        0.2,
                        0.2,
+                       0.2,
                        0.2
                     ]
 
-strategy = a.AnnealingStrategy(8,5,2,0.9,configpath,modificationTable,modificationChances,test_mode=True)
+strategy = a.AnnealingStrategy(8,5,2,0.9,configpath,modificationTable,modificationChances,test_mode=False)
 strategy.run()
 print('----finished----------------')
 bleu = strategy.performBleuMetrics()

@@ -16,7 +16,7 @@ lr = 0.001
 
 for i in range(0,1):
     print("iteration: "+str(i)+"lr: "+str(lr))
-    t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = lr, epochs = 100)
+    t.train_cuda(transformer, train_dataset, torch.cuda.current_device(), batch_size = 32, lr = lr, epochs = 20)
     print("Evaluation: ")
     quality = t.evaluate(transformer,test_dataset,use_cuda = True, device = torch.cuda.current_device(),batch_size=32)
     print(quality)

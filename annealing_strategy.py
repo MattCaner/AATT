@@ -21,6 +21,8 @@ class Solution:
 
 
 class ModificationFunctions:
+
+    ifRandomize = True
     
     @staticmethod
     def addRandomHead(transformer: t.Transformer) -> t.Transformer:
@@ -80,7 +82,7 @@ class ModificationFunctions:
     def addEncoder(transformer: t.Transformer) -> t.Transformer:
         # add an encoder:
         pos = random.randint(0,len(transformer.encoder_stack.encoders)-1)
-        transformer.encoder_stack.encoders.insert(pos,t.EncoderLayer(transformer.config))
+        transformer.encoder_stack.encoders.insert(pos,t.EncoderLayer(transformer.config,randomize=ModificationFunctions.ifRandomize))
         return transformer
 
     @staticmethod
@@ -95,7 +97,7 @@ class ModificationFunctions:
     def addDecoder(transformer: t.Transformer) -> t.Transformer:
         # add a decoder:
         pos = random.randint(0,len(transformer.decoder_stack.decoders)-1)
-        transformer.decoder_stack.decoders.insert(pos,t.DecoderLayer(transformer.config))
+        transformer.decoder_stack.decoders.insert(pos,t.DecoderLayer(transformer.config,randomize=ModificationFunctions.ifRandomize))
         return transformer
 
     @staticmethod
@@ -108,12 +110,12 @@ class ModificationFunctions:
 
     @staticmethod
     def addDecoderToEndOfStack(transformer: t.Transformer) -> t.Transformer:
-        transformer.decoder_stack.decoders.append(t.DecoderLayer(transformer.config))
+        transformer.decoder_stack.decoders.append(t.DecoderLayer(transformer.config,randomize=ModificationFunctions.ifRandomize))
         return transformer
 
     @staticmethod
     def addEncoderToEndOfStack(transformer: t.Transformer) -> t.Transformer:
-        transformer.encoder_stack.encoders.append(t.EncoderLayer(transformer.config))
+        transformer.encoder_stack.encoders.append(t.EncoderLayer(transformer.config,randomize=ModificationFunctions.ifRandomize))
         return transformer
     
     @staticmethod
@@ -124,6 +126,33 @@ class ModificationFunctions:
     @staticmethod
     def removeDecoderFromEndOfStack(transformer: t.Transformer) -> t.Transformer:
         transformer.decoder_stack.decoders.pop(-1)
+        return transformer
+
+    @staticmethod
+    def changeFFDimensions(transformer: t.Transformer) -> t.Transformer:
+        total_attentions = len(transformer.encoder_stack.encoders) + len(transformer.decoder_stack.decoders)
+        location = random.randint(0,total_attentions-1)
+        if location < len(transformer.encoder_stack.encoders):
+            old_dim = transformer.encoder_stack.encoders[location].d_ff
+            dim_model = transformer.d_model
+            ubound = int(old_dim * 1.1)+1
+            lbound = int(old_dim*0.9)-1
+            if old_dim < 2:
+                lbound = 1
+            change = random.randint(lbound,ubound)
+            changed = old_dim+change
+            transformer.encoder_stack.encoders[location].feed_forward = nn.Sequential(nn.Linear(dim_model,changed),nn.ReLU(),nn.Linear(changed,dim_model))
+        else:
+            location -= len(transformer.encoder_stack.encoders)
+            old_dim = transformer.decoder_stack.decoders[location].d_ff
+            dim_model = transformer.d_model
+            ubound = int(old_dim * 1.1)+1
+            lbound = int(old_dim*0.9)-1
+            if old_dim < 2:
+                lbound = 1
+            change = random.randint(lbound,ubound)
+            changed = old_dim+change
+            transformer.decoder_stack.decoders[location].feed_forward = nn.Sequential(nn.Linear(dim_model,changed),nn.ReLU(),nn.Linear(changed,dim_model))
         return transformer
 
 
