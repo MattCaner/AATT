@@ -2,10 +2,10 @@
 import annealing_strategy as a
 import os
 from pprint import pprint
-
-configpath = os.environ["SCRATCH"] + "/params_local.config"
+'''
+configpath = os.environ["SCRATCH"] + "/params.config"
 outpath = os.environ["SCRATCH"]
-
+'''
 
 configpath = "params_local.config"
 
