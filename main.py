@@ -27,7 +27,7 @@ modificationChances = [0.2,
                        0.2
                     ]
 
-strategy = a.AnnealingStrategy(8,5,2,0.9,configpath,modificationTable,modificationChances,test_mode=False)
+strategy = a.AnnealingStrategy(8,5,2,0.9,configpath,modificationTable,modificationChances,test_mode=False,result_output="tatoeba_run")
 strategy.run()
 print('----finished----------------')
 bleu = strategy.performBleuMetrics()
