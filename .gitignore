@@ -6,3 +6,6 @@ __pycache__/
 *.tmx
 *.pydump
 .vscode/
+*.tgz
+*.de
+*.en
