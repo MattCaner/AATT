@@ -120,12 +120,12 @@ class ModificationFunctions:
     
     @staticmethod
     def removeEncoderFromEndOfStack(transformer: t.Transformer) -> t.Transformer:
-        transformer.encoder_stack.encoders.pop(-1)
+        del transformer.encoder_stack.encoders[-1]
         return transformer
     
     @staticmethod
     def removeDecoderFromEndOfStack(transformer: t.Transformer) -> t.Transformer:
-        transformer.decoder_stack.decoders.pop(-1)
+        del transformer.decoder_stack.decoders[-1]
         return transformer
 
     @staticmethod
