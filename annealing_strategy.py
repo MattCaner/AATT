@@ -227,7 +227,7 @@ class AnnealingStrategy:
         old_fitness = solutions[thread_number].result
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         #res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=self.general_params.provide("epochs"),device=cuda.current_device())
-        res, epochs = t.train_cuda(new_transformer, self.train_dataset, cuda.current_device(), batch_size = 32, lr = new_transformer.config.provide("learning_rate"), epochs = 50)
+        res, epochs = t.train_cuda(new_transformer, self.train_dataset, cuda.current_device(), batch_size = 32, lr = new_transformer.config.provide("learning_rate"), epochs = self.general_params.provide("epochs"))
         new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         epochs_number[thread_number] = epochs
         if new_fitness < old_fitness:

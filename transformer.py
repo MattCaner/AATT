@@ -444,7 +444,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
     model.cuda(device=device)
     #criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
-    criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0,size_average=True).cuda(device)
+    criterion = nn.CrossEntropyLoss(reduction="average",ignore_index=0,size_average=True).cuda(device)
 
 
     model.train()
