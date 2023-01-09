@@ -183,6 +183,7 @@ class AnnealingStrategy:
         self.train_dataset, self.test_dataset = self.cd.getSets()
         if test_mode:
             self.test_dataset = self.train_dataset
+        print("Algorithm starting")
 
     def NeighbourOperator(self, transformer: t.Transformer, operationsMemory: List = None) -> t.Transformer:
         if self.mode == Mode.DEEPCOPY:
@@ -239,13 +240,20 @@ class AnnealingStrategy:
     def generateTemperature(self,initial_solutions: List) -> float:
         return max(i.result for i in initial_solutions) - min(i.result for i in initial_solutions)
 
+    def generateInitialSolution(self, thread_number: int, solutions: List[Solution]):
+        transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
+        #t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
+        res, epochs = t.train_cuda(transformer, self.train_dataset, cuda.current_device(), batch_size = 32, lr = transformer.config.provide("learning_rate"), epochs = self.general_params.provide("epochs"))
+        result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
+        solutions.append(Solution(transformer,result))
+
     def generateInitialSolutions(self) -> List[Solution]:
         s = []
-        for _ in range(self.num_threads):
-            transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
-            t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
-            result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
-            s.append(Solution(transformer,result))
+        thread_list = [threading.Thread(target=self.generateInitialSolution, args=(th,s)) for th in range(0,self.num_threads)]
+        for th in thread_list:
+            th.start()
+        for th in thread_list:
+            th.join()
         return s
 
     def run(self) -> None:
@@ -256,6 +264,7 @@ class AnnealingStrategy:
 
         print("preparing initial solution")
         solutions_list = self.generateInitialSolutions()
+        print("prepared solutions")
         temperature = self.generateTemperature(solutions_list)
 
         operations_memory = [[] for _ in range(self.num_threads)]

@@ -131,7 +131,7 @@ class VocabProvider():
         self.vocab.append_token("<eos>")    #end of sentence
         self.vocab.append_token("<sos>")    #start of sentence
         self.vocab.set_default_index(0)
-    
+        print("vocab created")
     def getVocabLength(self) -> int:
         return len(self.vocab)
 
