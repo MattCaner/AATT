@@ -441,18 +441,15 @@ class CustomDataSet(Dataset):
 
 def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batch_size = 32, lr: float = 0.1, epochs: int = 1) -> None:
     
-
     model.cuda(device=device)
     #criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
     criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0,size_average=True).cuda(device)
-
 
     model.train()
     optimizer = torch.optim.Adam(model.parameters(),lr=lr)
     data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     
     ntokens = model.vocab_out.getVocabLength()
-
 
     epoch_loss = 0.
     for epoch in range(epochs):
@@ -466,20 +463,6 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             last_loss = 0.
             data_in = data_in.cuda(device)
             data_out = data_out.cuda(device)
-            #data_out_numeric = data_out_numeric.cuda(device)
-
-
-            #data_out_numeric = torch.zeros(output.size())
-
-            #for s, sentence in enumerate(data_out):
-            #    for w, word in enumerate(sentence):
-            #        data_out_numeric[s][w][word] = 1.0
-
-            #data_out_numeric = data_out_numeric.cuda(device)
-
-            #for s, sentence in enumerate(data_out):
-            #    for w, word in enumerate(sentence):
-            #        data_out_numeric[s][w][word] = 1.0
             
             data_out_shifted = torch.roll(data_out,-1)
             for d in data_out_shifted:
@@ -498,6 +481,11 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
             last_loss = loss.item() / sum(len_out)
             epoch_loss += float(last_loss)
+            del loss
+            del data_in
+            del data_out
+            del data_out_shifted
+            del output
         epoch_loss /= len(data_loader)
 
         print("Epoch loss: "+str(epoch_loss))
