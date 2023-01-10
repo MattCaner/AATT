@@ -172,9 +172,16 @@ class AnnealingStrategy:
         self.global_best_solution = None
         self.mode = mode
 
+        self.device_number = cuda.device_count()
+
+        #distribute cuda devices between threads:
+        self.my_device = []
+        for i in range(self.num_threads):
+            self.my_device.append(i%self.device_number)
+
         self.modification_table = modification_table
         self.modification_chances = modification_chances
-
+        print("Preparing config")
         self.general_params = t.ParameterProvider(configFile)
 
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
@@ -226,6 +233,7 @@ class AnnealingStrategy:
 
     def performAnnealing(self, thread_number: int, solutions: List[Solution], epochs_number: List[int], T: float, operationsMemory: List) -> None:
         old_fitness = solutions[thread_number].result
+        cuda.device(self.my_device[thread_number])
         new_transformer = self.NeighbourOperator(solutions[thread_number].transformer, operationsMemory)
         #res, epochs = t.train_until_difference_cuda(new_transformer,self.train_dataset,0.005,lr=new_transformer.config.provide("learning_rate"),max_epochs=self.general_params.provide("epochs"),device=cuda.current_device())
         res, epochs = t.train_cuda(new_transformer, self.train_dataset, cuda.current_device(), batch_size = 32, lr = new_transformer.config.provide("learning_rate"), epochs = self.general_params.provide("epochs"))
@@ -241,6 +249,7 @@ class AnnealingStrategy:
         return max(i.result for i in initial_solutions) - min(i.result for i in initial_solutions)
 
     def generateInitialSolution(self, thread_number: int, solutions: List[Solution]):
+        cuda.device(self.my_device[thread_number])
         transformer = t.Transformer(self.general_params,self.v_in,self.v_out)
         #t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
         res, epochs = t.train_cuda(transformer, self.train_dataset, cuda.current_device(), batch_size = 32, lr = transformer.config.provide("learning_rate"), epochs = self.general_params.provide("epochs"))

@@ -444,7 +444,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
 
     model.cuda(device=device)
     #criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0).cuda(device)
-    criterion = nn.CrossEntropyLoss(reduction="average",ignore_index=0,size_average=True).cuda(device)
+    criterion = nn.CrossEntropyLoss(reduction="mean",ignore_index=0,size_average=True).cuda(device)
 
 
     model.train()
@@ -453,14 +453,17 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
     
     ntokens = model.vocab_out.getVocabLength()
 
-    last_loss = 0.
+
     epoch_loss = 0.
     for epoch in range(epochs):
+
         print('Epoch ' + str(epoch)+' of '+str(epochs))
         epoch_loss = 0.
         for i, (data_in, data_out, data_out_numeric, _, len_out) in enumerate(data_loader):
             if i%100 == 0:
                 print(str(i) + " of " + str(len(data_loader)))
+
+            last_loss = 0.
             data_in = data_in.cuda(device)
             data_out = data_out.cuda(device)
             #data_out_numeric = data_out_numeric.cuda(device)
@@ -482,8 +485,6 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             for d in data_out_shifted:
                 d[-1] = 0
 
-            
-
             data_out_shifted = data_out_shifted.cuda(device)
             optimizer.zero_grad()
             output = model(data_in, data_out)
@@ -496,7 +497,7 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             optimizer.step()
 
             last_loss = loss.item() / sum(len_out)
-            epoch_loss += last_loss
+            epoch_loss += float(last_loss)
         epoch_loss /= len(data_loader)
 
         print("Epoch loss: "+str(epoch_loss))
