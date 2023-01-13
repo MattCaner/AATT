@@ -240,10 +240,10 @@ class AnnealingStrategy:
         new_fitness = t.evaluate(new_transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
         epochs_number[thread_number] = epochs
         if new_fitness < old_fitness:
-            solutions[thread_number] = Solution(new_transformer,new_fitness)
+            solutions[thread_number] = Solution(new_transformer.to(device='cpu'),new_fitness)
         else:
             if random.uniform(0,1) < math.exp(-1.*(new_fitness - old_fitness) / T):
-                solutions[thread_number] = Solution(new_transformer,new_fitness)
+                solutions[thread_number] = Solution(new_transformer.to(device='cpu'),new_fitness)
 
     def generateTemperature(self,initial_solutions: List) -> float:
         return max(i.result for i in initial_solutions) - min(i.result for i in initial_solutions)
@@ -254,7 +254,7 @@ class AnnealingStrategy:
         #t.train_until_difference_cuda(transformer,self.train_dataset,0.005,lr=transformer.config.provide("learning_rate"),max_epochs=transformer.config.provide("epochs"),device=cuda.current_device())
         res, epochs = t.train_cuda(transformer, self.train_dataset, cuda.current_device(), batch_size = 32, lr = transformer.config.provide("learning_rate"), epochs = self.general_params.provide("epochs"))
         result = t.evaluate(transformer,self.test_dataset,use_cuda=True,device=cuda.current_device())
-        solutions.append(Solution(transformer,result))
+        solutions.append(Solution(transformer.to(device='cpu'),result))
 
     def generateInitialSolutions(self) -> List[Solution]:
         s = []

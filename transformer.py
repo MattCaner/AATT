@@ -482,8 +482,6 @@ def train_cuda(model: nn.Module, train_dataset: CustomDataSet, device: int, batc
             last_loss = loss.item() / sum(len_out)
             epoch_loss += float(last_loss)
             del loss
-            del data_in
-            del data_out
             del data_out_shifted
             del output
         epoch_loss /= len(data_loader)
