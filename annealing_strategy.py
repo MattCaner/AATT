@@ -181,7 +181,7 @@ class AnnealingStrategy:
 
         self.modification_table = modification_table
         self.modification_chances = modification_chances
-        print("Preparing config")
+        print("Preparing config", flush=True)
         self.general_params = t.ParameterProvider(configFile)
 
         self.v_in = t.VocabProvider(self.general_params,self.general_params.provide("language_in_file"))
@@ -190,7 +190,7 @@ class AnnealingStrategy:
         self.train_dataset, self.test_dataset = self.cd.getSets()
         if test_mode:
             self.test_dataset = self.train_dataset
-        print("Algorithm starting")
+        print("Algorithm starting", flush=True)
 
     def NeighbourOperator(self, transformer: t.Transformer, operationsMemory: List = None) -> t.Transformer:
         if self.mode == Mode.DEEPCOPY:
@@ -271,9 +271,9 @@ class AnnealingStrategy:
         file.write('Iteration, Best iteration value, Average iteration value, Temperature, Time, Epochs performed\n')
         file.close()
 
-        print("preparing initial solution")
+        print("preparing initial solution", flush=True)
         solutions_list = self.generateInitialSolutions()
-        print("prepared solutions")
+        print("prepared solutions", flush = True)
         temperature = self.generateTemperature(solutions_list)
 
         operations_memory = [[] for _ in range(self.num_threads)]
