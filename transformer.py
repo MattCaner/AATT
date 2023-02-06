@@ -578,6 +578,8 @@ def raw_data_bleu(model: Transformer, sentencesFrom: io.TextIOWrapper, sentences
     lines_compare = list(map(str.lower,sentencesTo.readlines()))
     lines = list(map(str.lower,sentencesFrom.readlines()))
 
+    model.cuda(torch.cuda.current_device())
+
     translated_list = []
     correct_translated = []
     for i, sentence in enumerate(lines):
@@ -589,6 +591,7 @@ def raw_data_bleu(model: Transformer, sentencesFrom: io.TextIOWrapper, sentences
 
 def raw_data_rogue(model: nn.Module, sentencesFrom: io.TextIOWrapper, sentencesTo: io.TextIOWrapper):
 
+    model.cuda(torch.cuda.current_device())
 
     lines_compare = list(map(str.lower,sentencesTo.readlines()))
     lines = list(map(str.lower,sentencesFrom.readlines()))
