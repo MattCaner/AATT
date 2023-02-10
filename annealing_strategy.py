@@ -339,4 +339,7 @@ class AnnealingStrategy:
         f_to_compare.close()
         return toReturn
 
-
+    def unpackBestSolution(self, filename):
+        file = open(filename,'rb')
+        self.global_best_solution = pickle.load(file)
+        file.close()
