@@ -36,7 +36,7 @@ strategy = a.AnnealingStrategy(8,1,2,0.9,configpath,modificationTable,modificati
 
 strategy.unpackBestSolution("result-epoch0.pydump")
 
-bleu = strategy.performBleuMetrics()
-rogue = strategy.performRogueMetrics()
+bleu = strategy.performBleuMetrics(useparams = False,filename_out="simplepl.txt")
+rogue = strategy.performRogueMetrics(useparams = False,filename_out="simplepl.txt")
 print(bleu)
 pprint(rogue)
