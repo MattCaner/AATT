@@ -321,9 +321,14 @@ class AnnealingStrategy:
                 for j in range(self.num_threads):
                     solutions_list[j] = global_best_solution
 
-    def performBleuMetrics(self):
-        f_to_translate = open(self.general_params.provide("language_in_file"),'r',encoding = 'utf-8')
-        f_to_compare = open(self.general_params.provide("language_out_file"),'r',encoding = 'utf-8')
+    def performBleuMetrics(self, useparams = True, filename_in = "", filename_out = ""):
+        f_in = filename_in
+        f_out = filename_out
+        if useparams:
+            f_in = self.general_params.provide("language_in_file")
+            f_out = self.general_params.provide("language_out_file")
+        f_to_translate = open(f_in,'r',encoding = 'utf-8')
+        f_to_compare = open(f_out,'r',encoding = 'utf-8')
         toReturn =  t.raw_data_bleu(self.global_best_solution.transformer,f_to_translate,f_to_compare)
         f_to_translate.close()
         f_to_compare.close()
@@ -331,9 +336,14 @@ class AnnealingStrategy:
 
 
 
-    def performRogueMetrics(self):
-        f_to_translate = open(self.general_params.provide("language_in_file"),'r',encoding = 'utf-8')
-        f_to_compare = open(self.general_params.provide("language_out_file"),'r',encoding = 'utf-8')
+    def performRogueMetrics(self, useparams = True, filename_in = "", filename_out = ""):
+        f_in = filename_in
+        f_out = filename_out
+        if useparams:
+            f_in = self.general_params.provide("language_in_file")
+            f_out = self.general_params.provide("language_out_file")
+        f_to_translate = open(f_in,'r',encoding = 'utf-8')
+        f_to_compare = open(f_out,'r',encoding = 'utf-8')
         toReturn = t.raw_data_rogue(self.global_best_solution.transformer,f_to_translate,f_to_compare)
         f_to_translate.close()
         f_to_compare.close()
@@ -343,3 +353,6 @@ class AnnealingStrategy:
         file = open(filename,'rb')
         self.global_best_solution = pickle.load(file)
         file.close()
+
+    def uptrain(self, epochs):
+        res, epochs = t.train_cuda(self.global_best_solution.transformer, self.train_dataset, cuda.current_device(), batch_size = 32, lr = self.global_best_solution.transformer.config.provide("learning_rate"), epochs = epochs)
